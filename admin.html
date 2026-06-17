@@ -6,7 +6,126 @@
 <title>Agri Link — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fraunces:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+// ===== USER PROFILE DRAWER =====
+async function openUserDrawer(id, name, role, email, phone, region) {
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.getElementById('user-drawer').classList.add('open');
+  document.getElementById('drawer-title').textContent = name || 'User Profile';
+  document.getElementById('drawer-body').innerHTML = '<div class="loading">Loading profile…</div>';
+
+  const isFarmer = role === 'farmer';
+  let statsHtml = '';
+  let activityHtml = '';
+
+  if (isFarmer) {
+    // Load farmer products and orders
+    const { data: products } = await db.from('products').select('*').eq('farmer_id', id).order('created_at', {ascending: false});
+    const productIds = (products || []).map(p => p.id);
+    let orders = [];
+    let totalEarned = 0;
+    let totalFees = 0;
+    if (productIds.length > 0) {
+      const { data: ord } = await db.from('orders').select('*, products(name,emoji), profiles(full_name)').in('product_id', productIds).order('created_at', {ascending: false});
+      orders = ord || [];
+      totalEarned = orders.reduce((s,o) => s + (o.subtotal - o.platform_fee), 0);
+      totalFees = orders.reduce((s,o) => s + o.platform_fee, 0);
+    }
+
+    statsHtml = `
+      <div class="drawer-stats">
+        <div class="drawer-stat"><div class="drawer-stat-label">Listings</div><div class="drawer-stat-val">${products?.length || 0}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Orders received</div><div class="drawer-stat-val">${orders.length}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Total earned</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalEarned.toLocaleString()}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalFees.toLocaleString()}</div></div>
+      </div>`;
+
+    const listingsRows = products?.length ? products.map(p => `
+      <tr>
+        <td>${p.emoji||'🌿'} ${p.name}</td>
+        <td><span class="badge badge-earth">${p.category}</span></td>
+        <td style="color:var(--green);font-weight:600">TZS ${Number(p.price).toLocaleString()}</td>
+        <td>${p.unit}</td>
+        <td><span class="badge ${p.available?'badge-green':'badge-red'}">${p.available?'Active':'Off'}</span></td>
+      </tr>`).join('') : `<tr><td colspan="5" class="drawer-empty">No listings yet</td></tr>`;
+
+    const orderRows = orders.length ? orders.slice(0,10).map(o => `
+      <tr>
+        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
+        <td>${o.profiles?.full_name||'Vendor'}</td>
+        <td>TZS ${Number(o.total).toLocaleString()}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
+      </tr>`).join('') : `<tr><td colspan="4" class="drawer-empty">No orders yet</td></tr>`;
+
+    activityHtml = `
+      <div class="drawer-section">
+        <div class="drawer-section-title">Product Listings (${products?.length||0})</div>
+        <table class="drawer-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Unit</th><th>Status</th></tr></thead>
+        <tbody>${listingsRows}</tbody></table>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Orders Received (${orders.length})</div>
+        <table class="drawer-table"><thead><tr><th>Product</th><th>Vendor</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>${orderRows}</tbody></table>
+      </div>`;
+
+  } else {
+    // Load vendor orders
+    const { data: orders } = await db.from('orders').select('*, products(name,emoji,profiles(full_name))').eq('vendor_id', id).order('created_at', {ascending: false});
+    const totalSpent = (orders||[]).reduce((s,o) => s + o.total, 0);
+    const totalFees = (orders||[]).reduce((s,o) => s + o.platform_fee, 0);
+
+    statsHtml = `
+      <div class="drawer-stats">
+        <div class="drawer-stat"><div class="drawer-stat-label">Orders placed</div><div class="drawer-stat-val">${orders?.length||0}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Total spent</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalSpent.toLocaleString()}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees paid</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalFees.toLocaleString()}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Avg order</div><div class="drawer-stat-val" style="font-size:14px">${orders?.length ? 'TZS '+(totalSpent/orders.length).toLocaleString(undefined,{maximumFractionDigits:0}) : '—'}</div></div>
+      </div>`;
+
+    const orderRows = orders?.length ? orders.map(o => `
+      <tr>
+        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
+        <td>${o.products?.profiles?.full_name||'Farmer'}</td>
+        <td>${o.quantity}</td>
+        <td style="color:var(--green);font-weight:600">TZS ${Number(o.total).toLocaleString()}</td>
+        <td>${o.payment_method||'—'}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
+      </tr>`).join('') : `<tr><td colspan="6" class="drawer-empty">No orders yet</td></tr>`;
+
+    activityHtml = `
+      <div class="drawer-section">
+        <div class="drawer-section-title">Order History (${orders?.length||0})</div>
+        <table class="drawer-table"><thead><tr><th>Product</th><th>Farmer</th><th>Qty</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
+        <tbody>${orderRows}</tbody></table>
+      </div>`;
+  }
+
+  const avatarColor = isFarmer ? 'var(--green)' : 'var(--amber)';
+  const initial = (name||'?')[0].toUpperCase();
+
+  document.getElementById('drawer-body').innerHTML = `
+    <div class="drawer-avatar" style="background:${avatarColor}">${initial}</div>
+    <div class="drawer-name">${name||'—'}</div>
+    <div class="drawer-meta">
+      <span>📧 ${email||'—'}</span>
+      <span>📱 ${phone||'—'}</span>
+      <span>📍 ${region||'—'}</span>
+    </div>
+    <div style="margin-bottom:20px">
+      <span class="badge ${isFarmer?'badge-green':'badge-amber'}" style="font-size:13px;padding:5px 14px">${isFarmer?'🌾 Farmer':'🍽️ Vendor'}</span>
+    </div>
+    ${statsHtml}
+    ${activityHtml}
+  `;
+}
+
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.getElementById('user-drawer').classList.remove('open');
+}
+
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -135,6 +254,33 @@ tr:hover td{background:#fdfcfa}
 .bar:hover{background:var(--green-dark)}
 .bar-label{font-size:11px;color:var(--text-muted);white-space:nowrap}
 .bar-val{font-size:11px;font-weight:600;color:var(--earth)}
+
+
+/* USER PROFILE DRAWER */
+.drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300}
+.drawer-overlay.open{display:block}
+.drawer{position:fixed;top:0;right:-500px;width:480px;max-width:95vw;height:100vh;background:var(--white);z-index:400;overflow-y:auto;transition:right 0.3s ease;box-shadow:-8px 0 40px rgba(0,0,0,0.15)}
+.drawer.open{right:0}
+.drawer-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--white);z-index:10}
+.drawer-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);padding:4px;border-radius:6px}
+.drawer-close:hover{background:var(--sand);color:var(--text)}
+.drawer-body{padding:24px}
+.drawer-avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;margin-bottom:16px}
+.drawer-name{font-size:1.3rem;font-family:'Fraunces',serif;color:var(--earth);margin-bottom:4px}
+.drawer-meta{font-size:13px;color:var(--text-muted);margin-bottom:20px;display:flex;flex-wrap:wrap;gap:8px}
+.drawer-meta span{display:flex;align-items:center;gap:4px}
+.drawer-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.drawer-stat{background:var(--sand);border-radius:10px;padding:14px}
+.drawer-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-weight:600;margin-bottom:4px}
+.drawer-stat-val{font-size:20px;font-weight:700;color:var(--earth);font-family:'Fraunces',serif}
+.drawer-section{margin-bottom:24px}
+.drawer-section-title{font-size:13px;font-weight:600;color:var(--earth);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.drawer-table{width:100%;border-collapse:collapse;font-size:13px}
+.drawer-table th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);padding:8px 10px;background:var(--sand);text-align:left}
+.drawer-table td{padding:9px 10px;border-top:1px solid var(--sand-dark)}
+.drawer-empty{text-align:center;padding:20px;color:var(--text-muted);font-size:13px}
+.clickable-row{cursor:pointer;transition:background 0.15s}
+.clickable-row:hover td{background:var(--green-light)!important}
 
 /* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--earth);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all 0.3s;max-width:300px}
@@ -374,6 +520,19 @@ tr:hover td{background:#fdfcfa}
   </div>
 </div>
 
+
+<!-- USER PROFILE DRAWER -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="user-drawer">
+  <div class="drawer-header">
+    <div style="font-size:14px;font-weight:600;color:var(--earth)" id="drawer-title">User Profile</div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body">
+    <div class="loading">Loading…</div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -521,7 +680,7 @@ async function loadUsers() {
     return;
   }
   body.innerHTML = data.map(u => `
-    <tr>
+    <tr class="clickable-row" onclick="openUserDrawer('${u.id}','${(u.full_name||'').replace(/'/g,"\\'")}','${u.role||''}','${u.email||''}','${u.phone||''}','${u.region||''}')">
       <td><div class="user-cell">
         <div class="user-avatar ${u.role==='farmer'?'farmer-av':'vendor-av'}">${(u.full_name||'?')[0].toUpperCase()}</div>
         <div><div class="user-name">${u.full_name || '—'}</div><div class="user-email">${u.email || ''}</div></div>
@@ -529,7 +688,7 @@ async function loadUsers() {
       <td><span class="badge ${u.role==='farmer'?'badge-green':'badge-amber'}">${u.role}</span></td>
       <td>${u.phone || '—'}</td>
       <td>${u.region || '—'}</td>
-      <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—'}</td>
+      <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—'} <span style="font-size:11px;color:var(--green);margin-left:6px">View →</span></td>
     </tr>`).join('');
 }
 
@@ -624,6 +783,125 @@ db.auth.getSession().then(({ data: { session } }) => {
     loadOverview();
   }
 });
+
+// ===== USER PROFILE DRAWER =====
+async function openUserDrawer(id, name, role, email, phone, region) {
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.getElementById('user-drawer').classList.add('open');
+  document.getElementById('drawer-title').textContent = name || 'User Profile';
+  document.getElementById('drawer-body').innerHTML = '<div class="loading">Loading profile…</div>';
+
+  const isFarmer = role === 'farmer';
+  let statsHtml = '';
+  let activityHtml = '';
+
+  if (isFarmer) {
+    // Load farmer products and orders
+    const { data: products } = await db.from('products').select('*').eq('farmer_id', id).order('created_at', {ascending: false});
+    const productIds = (products || []).map(p => p.id);
+    let orders = [];
+    let totalEarned = 0;
+    let totalFees = 0;
+    if (productIds.length > 0) {
+      const { data: ord } = await db.from('orders').select('*, products(name,emoji), profiles(full_name)').in('product_id', productIds).order('created_at', {ascending: false});
+      orders = ord || [];
+      totalEarned = orders.reduce((s,o) => s + (o.subtotal - o.platform_fee), 0);
+      totalFees = orders.reduce((s,o) => s + o.platform_fee, 0);
+    }
+
+    statsHtml = `
+      <div class="drawer-stats">
+        <div class="drawer-stat"><div class="drawer-stat-label">Listings</div><div class="drawer-stat-val">${products?.length || 0}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Orders received</div><div class="drawer-stat-val">${orders.length}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Total earned</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalEarned.toLocaleString()}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalFees.toLocaleString()}</div></div>
+      </div>`;
+
+    const listingsRows = products?.length ? products.map(p => `
+      <tr>
+        <td>${p.emoji||'🌿'} ${p.name}</td>
+        <td><span class="badge badge-earth">${p.category}</span></td>
+        <td style="color:var(--green);font-weight:600">TZS ${Number(p.price).toLocaleString()}</td>
+        <td>${p.unit}</td>
+        <td><span class="badge ${p.available?'badge-green':'badge-red'}">${p.available?'Active':'Off'}</span></td>
+      </tr>`).join('') : `<tr><td colspan="5" class="drawer-empty">No listings yet</td></tr>`;
+
+    const orderRows = orders.length ? orders.slice(0,10).map(o => `
+      <tr>
+        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
+        <td>${o.profiles?.full_name||'Vendor'}</td>
+        <td>TZS ${Number(o.total).toLocaleString()}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
+      </tr>`).join('') : `<tr><td colspan="4" class="drawer-empty">No orders yet</td></tr>`;
+
+    activityHtml = `
+      <div class="drawer-section">
+        <div class="drawer-section-title">Product Listings (${products?.length||0})</div>
+        <table class="drawer-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Unit</th><th>Status</th></tr></thead>
+        <tbody>${listingsRows}</tbody></table>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-title">Orders Received (${orders.length})</div>
+        <table class="drawer-table"><thead><tr><th>Product</th><th>Vendor</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>${orderRows}</tbody></table>
+      </div>`;
+
+  } else {
+    // Load vendor orders
+    const { data: orders } = await db.from('orders').select('*, products(name,emoji,profiles(full_name))').eq('vendor_id', id).order('created_at', {ascending: false});
+    const totalSpent = (orders||[]).reduce((s,o) => s + o.total, 0);
+    const totalFees = (orders||[]).reduce((s,o) => s + o.platform_fee, 0);
+
+    statsHtml = `
+      <div class="drawer-stats">
+        <div class="drawer-stat"><div class="drawer-stat-label">Orders placed</div><div class="drawer-stat-val">${orders?.length||0}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Total spent</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalSpent.toLocaleString()}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees paid</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalFees.toLocaleString()}</div></div>
+        <div class="drawer-stat"><div class="drawer-stat-label">Avg order</div><div class="drawer-stat-val" style="font-size:14px">${orders?.length ? 'TZS '+(totalSpent/orders.length).toLocaleString(undefined,{maximumFractionDigits:0}) : '—'}</div></div>
+      </div>`;
+
+    const orderRows = orders?.length ? orders.map(o => `
+      <tr>
+        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
+        <td>${o.products?.profiles?.full_name||'Farmer'}</td>
+        <td>${o.quantity}</td>
+        <td style="color:var(--green);font-weight:600">TZS ${Number(o.total).toLocaleString()}</td>
+        <td>${o.payment_method||'—'}</td>
+        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
+      </tr>`).join('') : `<tr><td colspan="6" class="drawer-empty">No orders yet</td></tr>`;
+
+    activityHtml = `
+      <div class="drawer-section">
+        <div class="drawer-section-title">Order History (${orders?.length||0})</div>
+        <table class="drawer-table"><thead><tr><th>Product</th><th>Farmer</th><th>Qty</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
+        <tbody>${orderRows}</tbody></table>
+      </div>`;
+  }
+
+  const avatarColor = isFarmer ? 'var(--green)' : 'var(--amber)';
+  const initial = (name||'?')[0].toUpperCase();
+
+  document.getElementById('drawer-body').innerHTML = `
+    <div class="drawer-avatar" style="background:${avatarColor}">${initial}</div>
+    <div class="drawer-name">${name||'—'}</div>
+    <div class="drawer-meta">
+      <span>📧 ${email||'—'}</span>
+      <span>📱 ${phone||'—'}</span>
+      <span>📍 ${region||'—'}</span>
+    </div>
+    <div style="margin-bottom:20px">
+      <span class="badge ${isFarmer?'badge-green':'badge-amber'}" style="font-size:13px;padding:5px 14px">${isFarmer?'🌾 Farmer':'🍽️ Vendor'}</span>
+    </div>
+    ${statsHtml}
+    ${activityHtml}
+  `;
+}
+
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.getElementById('user-drawer').classList.remove('open');
+}
+
 </script>
 </body>
 </html>
