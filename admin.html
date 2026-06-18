@@ -671,7 +671,7 @@ async function loadOverview() {
 // ===== USERS =====
 let _allUsers = [];
 async function loadUsers() {
-  const { data   const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
+  const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
   _allUsers = data || [];
   const farmers = _allUsers.filter(u => u.role === 'farmer').length;
   const vendors = _allUsers.filter(u => u.role === 'vendor').length;
@@ -695,30 +695,7 @@ async function loadUsers() {
       <td>${u.region || '—'}</td>
       <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—'} <span style="font-size:11px;color:var(--green);margin-left:6px">View →</span></td>
     </tr>`).join('');
-  const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
-  const farmers = data?.filter(u => u.role === 'farmer').length || 0;
-  const vendors = data?.filter(u => u.role === 'vendor').length || 0;
-  document.getElementById('u-total').textContent = data?.length || 0;
-  document.getElementById('u-farmers').textContent = farmers;
-  document.getElementById('u-vendors').textContent = vendors;
-  document.getElementById('users-count').textContent = data?.length || 0;
-  const body = document.getElementById('users-body');
-  if (!data || data.length === 0) {
-    body.innerHTML = '<tr><td colspan="5" class="empty-row">No users registered yet</td></tr>';
-    return;
-  }
-  body.innerHTML = data.map(u => `
-    <tr class="clickable-row" onclick="openUserDrawer('${u.id}','${(u.full_name||'').replace(/'/g,"\\'")}','${u.role||''}','${u.email||''}','${u.phone||''}','${u.region||''}')">
-      <td><div class="user-cell">
-        <div class="user-avatar ${u.role==='farmer'?'farmer-av':'vendor-av'}">${(u.full_name||'?')[0].toUpperCase()}</div>
-        <div><div class="user-name">${u.full_name || '—'}</div><div class="user-email">${u.email || ''}</div></div>
-      </div></td>
-      <td><span class="badge ${u.role==='farmer'?'badge-green':'badge-amber'}">${u.role}</span></td>
-      <td>${u.phone || '—'}</td>
-      <td>${u.region || '—'}</td>
-      <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—'} <span style="font-size:11px;color:var(--green);margin-left:6px">View →</span></td>
-    </tr>`).join('');
-}
+
 
 // ===== PRODUCTS =====
 async function loadProducts() {
