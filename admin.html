@@ -671,7 +671,7 @@ async function loadOverview() {
 // ===== USERS =====
 let _allUsers = [];
 async function loadUsers() {
-  const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
+  const { data   const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
   _allUsers = data || [];
   const farmers = _allUsers.filter(u => u.role === 'farmer').length;
   const vendors = _allUsers.filter(u => u.role === 'vendor').length;
@@ -695,7 +695,7 @@ async function loadUsers() {
       <td>${u.region || '—'}</td>
       <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—'} <span style="font-size:11px;color:var(--green);margin-left:6px">View →</span></td>
     </tr>`).join('');
-} = await db.from('profiles').select('*').order('created_at', { ascending: false });
+  const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
   const farmers = data?.filter(u => u.role === 'farmer').length || 0;
   const vendors = data?.filter(u => u.role === 'vendor').length || 0;
   document.getElementById('u-total').textContent = data?.length || 0;
