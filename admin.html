@@ -8,7 +8,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fraunces:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 // ===== USER PROFILE DRAWER =====
-async function openUserDrawer(id, name, role, email, phone, region) {
+async function openUserDrawer(idx) {
+  const u = _allUsers[idx];
+  if (!u) return;
+  const id = u.id, name = u.full_name, role = u.role, email = u.email, phone = u.phone, region = u.region;
   document.getElementById('drawer-overlay').classList.add('open');
   document.getElementById('user-drawer').classList.add('open');
   document.getElementById('drawer-title').textContent = name || 'User Profile';
@@ -666,8 +669,33 @@ async function loadOverview() {
 }
 
 // ===== USERS =====
+let _allUsers = [];
 async function loadUsers() {
   const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
+  _allUsers = data || [];
+  const farmers = _allUsers.filter(u => u.role === 'farmer').length;
+  const vendors = _allUsers.filter(u => u.role === 'vendor').length;
+  document.getElementById('u-total').textContent = _allUsers.length;
+  document.getElementById('u-farmers').textContent = farmers;
+  document.getElementById('u-vendors').textContent = vendors;
+  document.getElementById('users-count').textContent = _allUsers.length;
+  const body = document.getElementById('users-body');
+  if (!_allUsers.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty-row">No users registered yet</td></tr>';
+    return;
+  }
+  body.innerHTML = _allUsers.map((u, i) => `
+    <tr class="clickable-row" onclick="openUserDrawer(${i})">
+      <td><div class="user-cell">
+        <div class="user-avatar ${u.role==='farmer'?'farmer-av':'vendor-av'}">${(u.full_name||'?')[0].toUpperCase()}</div>
+        <div><div class="user-name">${u.full_name || '—'}</div><div class="user-email">${u.email || ''}</div></div>
+      </div></td>
+      <td><span class="badge ${u.role==='farmer'?'badge-green':'badge-amber'}">${u.role}</span></td>
+      <td>${u.phone || '—'}</td>
+      <td>${u.region || '—'}</td>
+      <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—'} <span style="font-size:11px;color:var(--green);margin-left:6px">View →</span></td>
+    </tr>`).join('');
+} = await db.from('profiles').select('*').order('created_at', { ascending: false });
   const farmers = data?.filter(u => u.role === 'farmer').length || 0;
   const vendors = data?.filter(u => u.role === 'vendor').length || 0;
   document.getElementById('u-total').textContent = data?.length || 0;
@@ -785,7 +813,10 @@ db.auth.getSession().then(({ data: { session } }) => {
 });
 
 // ===== USER PROFILE DRAWER =====
-async function openUserDrawer(id, name, role, email, phone, region) {
+async function openUserDrawer(idx) {
+  const u = _allUsers[idx];
+  if (!u) return;
+  const id = u.id, name = u.full_name, role = u.role, email = u.email, phone = u.phone, region = u.region;
   document.getElementById('drawer-overlay').classList.add('open');
   document.getElementById('user-drawer').classList.add('open');
   document.getElementById('drawer-title').textContent = name || 'User Profile';
