@@ -6,129 +6,7 @@
 <title>Agri Link — Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fraunces:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-// ===== USER PROFILE DRAWER =====
-async function openUserDrawer(idx) {
-  const u = _allUsers[idx];
-  if (!u) return;
-  const id = u.id, name = u.full_name, role = u.role, email = u.email, phone = u.phone, region = u.region;
-  document.getElementById('drawer-overlay').classList.add('open');
-  document.getElementById('user-drawer').classList.add('open');
-  document.getElementById('drawer-title').textContent = name || 'User Profile';
-  document.getElementById('drawer-body').innerHTML = '<div class="loading">Loading profile…</div>';
-
-  const isFarmer = role === 'farmer';
-  let statsHtml = '';
-  let activityHtml = '';
-
-  if (isFarmer) {
-    // Load farmer products and orders
-    const { data: products } = await db.from('products').select('*').eq('farmer_id', id).order('created_at', {ascending: false});
-    const productIds = (products || []).map(p => p.id);
-    let orders = [];
-    let totalEarned = 0;
-    let totalFees = 0;
-    if (productIds.length > 0) {
-      const { data: ord } = await db.from('orders').select('*, products(name,emoji), profiles(full_name)').in('product_id', productIds).order('created_at', {ascending: false});
-      orders = ord || [];
-      totalEarned = orders.reduce((s,o) => s + (o.subtotal - o.platform_fee), 0);
-      totalFees = orders.reduce((s,o) => s + o.platform_fee, 0);
-    }
-
-    statsHtml = `
-      <div class="drawer-stats">
-        <div class="drawer-stat"><div class="drawer-stat-label">Listings</div><div class="drawer-stat-val">${products?.length || 0}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Orders received</div><div class="drawer-stat-val">${orders.length}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Total earned</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalEarned.toLocaleString()}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalFees.toLocaleString()}</div></div>
-      </div>`;
-
-    const listingsRows = products?.length ? products.map(p => `
-      <tr>
-        <td>${p.emoji||'🌿'} ${p.name}</td>
-        <td><span class="badge badge-earth">${p.category}</span></td>
-        <td style="color:var(--green);font-weight:600">TZS ${Number(p.price).toLocaleString()}</td>
-        <td>${p.unit}</td>
-        <td><span class="badge ${p.available?'badge-green':'badge-red'}">${p.available?'Active':'Off'}</span></td>
-      </tr>`).join('') : `<tr><td colspan="5" class="drawer-empty">No listings yet</td></tr>`;
-
-    const orderRows = orders.length ? orders.slice(0,10).map(o => `
-      <tr>
-        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
-        <td>${o.profiles?.full_name||'Vendor'}</td>
-        <td>TZS ${Number(o.total).toLocaleString()}</td>
-        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
-      </tr>`).join('') : `<tr><td colspan="4" class="drawer-empty">No orders yet</td></tr>`;
-
-    activityHtml = `
-      <div class="drawer-section">
-        <div class="drawer-section-title">Product Listings (${products?.length||0})</div>
-        <table class="drawer-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Unit</th><th>Status</th></tr></thead>
-        <tbody>${listingsRows}</tbody></table>
-      </div>
-      <div class="drawer-section">
-        <div class="drawer-section-title">Orders Received (${orders.length})</div>
-        <table class="drawer-table"><thead><tr><th>Product</th><th>Vendor</th><th>Total</th><th>Status</th></tr></thead>
-        <tbody>${orderRows}</tbody></table>
-      </div>`;
-
-  } else {
-    // Load vendor orders
-    const { data: orders } = await db.from('orders').select('*, products(name,emoji,profiles(full_name))').eq('vendor_id', id).order('created_at', {ascending: false});
-    const totalSpent = (orders||[]).reduce((s,o) => s + o.total, 0);
-    const totalFees = (orders||[]).reduce((s,o) => s + o.platform_fee, 0);
-
-    statsHtml = `
-      <div class="drawer-stats">
-        <div class="drawer-stat"><div class="drawer-stat-label">Orders placed</div><div class="drawer-stat-val">${orders?.length||0}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Total spent</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalSpent.toLocaleString()}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees paid</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalFees.toLocaleString()}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Avg order</div><div class="drawer-stat-val" style="font-size:14px">${orders?.length ? 'TZS '+(totalSpent/orders.length).toLocaleString(undefined,{maximumFractionDigits:0}) : '—'}</div></div>
-      </div>`;
-
-    const orderRows = orders?.length ? orders.map(o => `
-      <tr>
-        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
-        <td>${o.products?.profiles?.full_name||'Farmer'}</td>
-        <td>${o.quantity}</td>
-        <td style="color:var(--green);font-weight:600">TZS ${Number(o.total).toLocaleString()}</td>
-        <td>${o.payment_method||'—'}</td>
-        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
-      </tr>`).join('') : `<tr><td colspan="6" class="drawer-empty">No orders yet</td></tr>`;
-
-    activityHtml = `
-      <div class="drawer-section">
-        <div class="drawer-section-title">Order History (${orders?.length||0})</div>
-        <table class="drawer-table"><thead><tr><th>Product</th><th>Farmer</th><th>Qty</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
-        <tbody>${orderRows}</tbody></table>
-      </div>`;
-  }
-
-  const avatarColor = isFarmer ? 'var(--green)' : 'var(--amber)';
-  const initial = (name||'?')[0].toUpperCase();
-
-  document.getElementById('drawer-body').innerHTML = `
-    <div class="drawer-avatar" style="background:${avatarColor}">${initial}</div>
-    <div class="drawer-name">${name||'—'}</div>
-    <div class="drawer-meta">
-      <span>📧 ${email||'—'}</span>
-      <span>📱 ${phone||'—'}</span>
-      <span>📍 ${region||'—'}</span>
-    </div>
-    <div style="margin-bottom:20px">
-      <span class="badge ${isFarmer?'badge-green':'badge-amber'}" style="font-size:13px;padding:5px 14px">${isFarmer?'🌾 Farmer':'🍽️ Vendor'}</span>
-    </div>
-    ${statsHtml}
-    ${activityHtml}
-  `;
-}
-
-function closeDrawer() {
-  document.getElementById('drawer-overlay').classList.remove('open');
-  document.getElementById('user-drawer').classList.remove('open');
-}
-
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -138,55 +16,45 @@ function closeDrawer() {
   --red:#dc2626;--red-light:#FEE2E2;
   --text:#1a1a1a;--text-muted:#6b6b6b;--border:#d4d0c8;
   --sidebar:220px;--radius:10px;--radius-lg:16px;
-  --shadow:0 2px 12px rgba(0,0,0,0.07);
 }
 body{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;line-height:1.6;color:var(--text);background:var(--sand);min-height:100vh}
 h1,h2,h3{font-family:'Fraunces',serif;font-weight:700;line-height:1.2}
 
-/* LOGIN SCREEN */
+/* LOGIN */
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--earth)}
 .login-box{background:var(--white);border-radius:var(--radius-lg);padding:40px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
 .login-logo-leaf{width:38px;height:38px;background:var(--green);border-radius:50% 50% 50% 0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
-.login-logo span{font-family:'Fraunces',serif;font-size:1.3rem;font-weight:700;color:var(--earth)}
+.login-logo-text span{font-family:'Fraunces',serif;font-size:1.3rem;font-weight:700;color:var(--earth);display:block}
+.login-logo-text small{font-size:10px;color:var(--text-muted);font-weight:600;letter-spacing:1px;text-transform:uppercase}
 .login-box h2{color:var(--earth);font-size:1.3rem;margin-bottom:4px}
 .login-box p{color:var(--text-muted);font-size:13px;margin-bottom:24px}
 .form-group{margin-bottom:16px}
 .form-group label{font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:5px}
 .form-group input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;background:var(--sand);color:var(--text);outline:none;transition:border 0.2s}
 .form-group input:focus{border-color:var(--green);background:var(--white)}
-.btn{display:inline-block;padding:10px 20px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;font-family:'Plus Jakarta Sans',sans-serif}
-.btn-primary{background:var(--green);color:#fff;width:100%;text-align:center}
+.btn-primary{display:block;width:100%;padding:11px 20px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;background:var(--green);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;transition:background 0.2s}
 .btn-primary:hover{background:var(--green-dark)}
-.btn-sm{padding:5px 12px;font-size:12px}
-.btn-danger{background:var(--red);color:#fff}
-.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text-muted)}
-.btn-outline:hover{border-color:var(--green);color:var(--green)}
-.login-error{color:var(--red);font-size:13px;margin-top:8px;display:none}
+.login-error{color:var(--red);font-size:13px;margin-top:10px;display:none}
 
 /* LAYOUT */
 #app{display:none;min-height:100vh}
-
-/* SIDEBAR */
 .sidebar{position:fixed;top:0;left:0;width:var(--sidebar);height:100vh;background:var(--earth);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
 .sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.1)}
 .sidebar-logo-inner{display:flex;align-items:center;gap:10px}
-.sidebar-logo-leaf{width:32px;height:32px;background:var(--green);border-radius:50% 50% 50% 0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;flex-shrink:0}
-.sidebar-logo span{font-family:'Fraunces',serif;font-size:1.1rem;color:#fff}
-.sidebar-logo small{display:block;font-size:10px;color:#9FE1CB;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.s-leaf{width:32px;height:32px;background:var(--green);border-radius:50% 50% 50% 0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;flex-shrink:0}
+.s-title{font-family:'Fraunces',serif;font-size:1.1rem;color:#fff;display:block}
+.s-sub{font-size:10px;color:#9FE1CB;font-weight:600;letter-spacing:1px;text-transform:uppercase}
 .sidebar-nav{padding:16px 12px;flex:1}
-.nav-section-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.3);padding:12px 8px 6px}
+.nav-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.3);padding:12px 8px 6px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,0.7);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
 .nav-item:hover{background:rgba(255,255,255,0.08);color:#fff}
 .nav-item.active{background:var(--green);color:#fff}
-.nav-icon{font-size:16px;width:20px;text-align:center}
 .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.1)}
 .admin-badge{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(255,255,255,0.06);border-radius:8px;margin-bottom:10px}
-.admin-avatar{width:30px;height:30px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:700}
+.admin-av{width:30px;height:30px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:700}
 .admin-name{font-size:12px;color:#fff;font-weight:600}
 .admin-role{font-size:10px;color:#9FE1CB}
-
-/* MAIN CONTENT */
 .main{margin-left:var(--sidebar);min-height:100vh;display:flex;flex-direction:column}
 .topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .topbar-title{font-size:15px;font-weight:600;color:var(--earth)}
@@ -194,9 +62,9 @@ h1,h2,h3{font-family:'Fraunces',serif;font-weight:700;line-height:1.2}
 .live-dot{width:8px;height:8px;background:#22c55e;border-radius:50%;display:inline-block;animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .live-label{font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:5px}
+.refresh-btn{background:var(--sand);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+.refresh-btn:hover{background:var(--green-light);border-color:var(--green);color:var(--green-dark)}
 .content{padding:28px 32px;flex:1}
-
-/* PAGES */
 .page{display:none}
 .page.active{display:block}
 
@@ -205,12 +73,10 @@ h1,h2,h3{font-family:'Fraunces',serif;font-weight:700;line-height:1.2}
 .stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;position:relative;overflow:hidden}
 .stat-card::after{content:'';position:absolute;top:0;right:0;width:4px;height:100%;background:var(--green)}
 .stat-card.amber::after{background:var(--amber)}
-.stat-card.red::after{background:var(--red)}
 .stat-card.earth::after{background:var(--earth)}
 .stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px}
 .stat-val{font-size:26px;font-weight:700;color:var(--earth);font-family:'Fraunces',serif;line-height:1}
 .stat-sub{font-size:12px;color:var(--text-muted);margin-top:4px}
-.stat-icon{position:absolute;top:16px;right:16px;font-size:22px;opacity:0.15}
 
 /* TABLES */
 .table-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:24px}
@@ -228,91 +94,60 @@ tr:hover td{background:#fdfcfa}
 .badge-earth{background:#EDE7E2;color:var(--earth)}
 .badge-blue{background:#E6F1FB;color:#185FA5}
 .user-cell{display:flex;align-items:center;gap:10px}
-.user-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.u-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
 .farmer-av{background:var(--green)}
 .vendor-av{background:var(--amber)}
-.user-name{font-weight:500;color:var(--earth)}
-.user-email{font-size:11px;color:var(--text-muted)}
-.empty-row{text-align:center;padding:32px;color:var(--text-muted);font-size:13px}
-
-/* SECTION HEADERS */
+.u-name{font-weight:500;color:var(--earth)}
+.u-email{font-size:11px;color:var(--text-muted)}
+.empty-row td{text-align:center;padding:32px;color:var(--text-muted);font-size:13px}
+.loading-row td{text-align:center;padding:24px;color:var(--text-muted);font-size:13px}
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .section-header h2{font-size:1.2rem;color:var(--earth)}
 .section-header p{font-size:13px;color:var(--text-muted)}
+.clickable-row{cursor:pointer}
+.clickable-row:hover td{background:var(--green-light) !important}
 
 /* MESSAGES */
 .msg-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px}
-.msg-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .msg-name{font-weight:600;font-size:14px;color:var(--earth)}
-.msg-role{font-size:11px;color:var(--text-muted)}
-.msg-phone{font-size:13px;color:var(--green);margin-bottom:6px}
+.msg-phone{font-size:13px;color:var(--green);margin:4px 0}
 .msg-body{font-size:13px;color:var(--text-muted);line-height:1.5}
 
-/* CHART BAR */
-.chart-wrap{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:24px}
-.chart-title{font-size:14px;font-weight:600;color:var(--earth);margin-bottom:20px}
-.bar-chart{display:flex;align-items:flex-end;gap:12px;height:120px}
-.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
-.bar{width:100%;background:var(--green);border-radius:4px 4px 0 0;transition:height 0.5s ease;min-height:4px;position:relative}
-.bar:hover{background:var(--green-dark)}
-.bar-label{font-size:11px;color:var(--text-muted);white-space:nowrap}
-.bar-val{font-size:11px;font-weight:600;color:var(--earth)}
-
-
-/* USER PROFILE DRAWER */
+/* DRAWER */
 .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300}
 .drawer-overlay.open{display:block}
 .drawer{position:fixed;top:0;right:-500px;width:480px;max-width:95vw;height:100vh;background:var(--white);z-index:400;overflow-y:auto;transition:right 0.3s ease;box-shadow:-8px 0 40px rgba(0,0,0,0.15)}
 .drawer.open{right:0}
-.drawer-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--white);z-index:10}
-.drawer-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);padding:4px;border-radius:6px}
-.drawer-close:hover{background:var(--sand);color:var(--text)}
+.drawer-head{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--white);z-index:10}
+.drawer-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);padding:4px 8px;border-radius:6px}
+.drawer-close:hover{background:var(--sand)}
 .drawer-body{padding:24px}
-.drawer-avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;margin-bottom:16px}
-.drawer-name{font-size:1.3rem;font-family:'Fraunces',serif;color:var(--earth);margin-bottom:4px}
-.drawer-meta{font-size:13px;color:var(--text-muted);margin-bottom:20px;display:flex;flex-wrap:wrap;gap:8px}
-.drawer-meta span{display:flex;align-items:center;gap:4px}
-.drawer-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
-.drawer-stat{background:var(--sand);border-radius:10px;padding:14px}
-.drawer-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-weight:600;margin-bottom:4px}
-.drawer-stat-val{font-size:20px;font-weight:700;color:var(--earth);font-family:'Fraunces',serif}
-.drawer-section{margin-bottom:24px}
-.drawer-section-title{font-size:13px;font-weight:600;color:var(--earth);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.drawer-table{width:100%;border-collapse:collapse;font-size:13px}
-.drawer-table th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);padding:8px 10px;background:var(--sand);text-align:left}
-.drawer-table td{padding:9px 10px;border-top:1px solid var(--sand-dark)}
-.drawer-empty{text-align:center;padding:20px;color:var(--text-muted);font-size:13px}
-.clickable-row{cursor:pointer;transition:background 0.15s}
-.clickable-row:hover td{background:var(--green-light)!important}
+.d-avatar{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;margin-bottom:14px}
+.d-name{font-size:1.2rem;font-family:'Fraunces',serif;color:var(--earth);margin-bottom:4px}
+.d-meta{font-size:13px;color:var(--text-muted);margin-bottom:16px}
+.d-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.d-stat{background:var(--sand);border-radius:10px;padding:12px}
+.d-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-weight:600;margin-bottom:4px}
+.d-stat-val{font-size:18px;font-weight:700;color:var(--earth);font-family:'Fraunces',serif}
+.d-section{margin-bottom:20px}
+.d-section-title{font-size:13px;font-weight:600;color:var(--earth);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.d-table{width:100%;border-collapse:collapse;font-size:13px}
+.d-table th{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text-muted);padding:8px 10px;background:var(--sand);text-align:left}
+.d-table td{padding:9px 10px;border-top:1px solid var(--sand-dark)}
+.d-empty{text-align:center;padding:20px;color:var(--text-muted);font-size:13px}
 
 /* TOAST */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--earth);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all 0.3s;max-width:300px}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--earth);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all 0.3s}
 .toast.show{transform:translateY(0);opacity:1}
-.toast.error{background:var(--red)}
-
-/* LOADING */
-.loading{text-align:center;padding:32px;color:var(--text-muted);font-size:13px}
-
-/* REFRESH BTN */
-.refresh-btn{background:var(--sand);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'Plus Jakarta Sans',sans-serif}
-.refresh-btn:hover{background:var(--green-light);border-color:var(--green);color:var(--green-dark)}
-
-@media(max-width:768px){
-  .sidebar{width:100%;height:auto;position:relative}
-  .main{margin-left:0}
-  .content{padding:16px}
-  .stat-grid{grid-template-columns:1fr 1fr}
-}
 </style>
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-leaf">🌿</div>
-      <div>
+      <div class="login-logo-text">
         <span>Agri Link</span>
         <small>Admin Portal</small>
       </div>
@@ -325,257 +160,183 @@ tr:hover td{background:#fdfcfa}
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="admin-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doAdminLogin()"/>
+      <input type="password" id="admin-password" placeholder="••••••••"/>
     </div>
-    <button class="btn btn-primary" onclick="doAdminLogin()">Sign in to dashboard</button>
+    <button class="btn-primary" id="login-btn" onclick="doAdminLogin()">Sign in to dashboard</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
 
-<!-- MAIN APP -->
 <div id="app">
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-inner">
-        <div class="sidebar-logo-leaf">🌿</div>
-        <div>
-          <span>Agri Link</span>
-          <small>Admin Panel</small>
-        </div>
+        <div class="s-leaf">🌿</div>
+        <div><span class="s-title">Agri Link</span><span class="s-sub">Admin</span></div>
       </div>
     </div>
     <nav class="sidebar-nav">
-      <div class="nav-section-label">Overview</div>
-      <button class="nav-item active" onclick="showPage('overview',this)"><span class="nav-icon">📊</span> Overview</button>
-      <div class="nav-section-label">Platform</div>
-      <button class="nav-item" onclick="showPage('users',this)"><span class="nav-icon">👥</span> Users</button>
-      <button class="nav-item" onclick="showPage('products',this)"><span class="nav-icon">🌿</span> Listings</button>
-      <button class="nav-item" onclick="showPage('orders',this)"><span class="nav-icon">📦</span> Orders</button>
-      <div class="nav-section-label">Engagement</div>
-      <button class="nav-item" onclick="showPage('messages',this)"><span class="nav-icon">✉️</span> Messages</button>
-      <div class="nav-section-label">Settings</div>
-      <button class="nav-item" onclick="window.open('https://alvincharles824-rgb.github.io/agrilink/','_blank')"><span class="nav-icon">🌐</span> View Site</button>
+      <div class="nav-label">Overview</div>
+      <button class="nav-item active" onclick="showPage('overview',this)">📊 Overview</button>
+      <div class="nav-label">Platform</div>
+      <button class="nav-item" onclick="showPage('users',this)">👥 Users</button>
+      <button class="nav-item" onclick="showPage('products',this)">🌿 Listings</button>
+      <button class="nav-item" onclick="showPage('orders',this)">📦 Orders</button>
+      <div class="nav-label">Engagement</div>
+      <button class="nav-item" onclick="showPage('messages',this)">✉️ Messages</button>
+      <div class="nav-label">Settings</div>
+      <button class="nav-item" onclick="window.open('https://alvincharles824-rgb.github.io/agrilink/','_blank')">🌐 View Site</button>
     </nav>
     <div class="sidebar-footer">
       <div class="admin-badge">
-        <div class="admin-avatar">A</div>
-        <div>
-          <div class="admin-name" id="admin-name">Admin</div>
-          <div class="admin-role">Platform Owner</div>
-        </div>
+        <div class="admin-av">A</div>
+        <div><div class="admin-name" id="admin-name">Admin</div><div class="admin-role">Platform Owner</div></div>
       </div>
-      <button class="nav-item" onclick="doLogout()" style="color:rgba(255,100,100,0.8)"><span class="nav-icon">🚪</span> Logout</button>
+      <button class="nav-item" style="color:rgba(255,100,100,0.8)" onclick="doLogout()">🚪 Logout</button>
     </div>
   </div>
 
-  <!-- MAIN -->
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Overview</div>
       <div class="topbar-right">
         <div class="live-label"><span class="live-dot"></span> Live data</div>
-        <button class="refresh-btn" onclick="refreshCurrentPage()">↻ Refresh</button>
+        <button class="refresh-btn" onclick="refreshPage()">↻ Refresh</button>
       </div>
     </div>
-
     <div class="content">
 
-      <!-- OVERVIEW PAGE -->
+      <!-- OVERVIEW -->
       <div class="page active" id="page-overview">
-        <div class="section-header">
-          <div><h2>Platform Overview</h2><p>Real-time snapshot of Agri Link activity</p></div>
-        </div>
+        <div class="section-header"><div><h2>Platform Overview</h2><p>Real-time snapshot of Agri Link</p></div></div>
         <div class="stat-grid">
-          <div class="stat-card">
-            <div class="stat-icon">🌾</div>
-            <div class="stat-label">Total Farmers</div>
-            <div class="stat-val" id="ov-farmers">—</div>
-            <div class="stat-sub">Registered on platform</div>
-          </div>
-          <div class="stat-card amber">
-            <div class="stat-icon">🍽️</div>
-            <div class="stat-label">Total Vendors</div>
-            <div class="stat-val" id="ov-vendors">—</div>
-            <div class="stat-sub">Restaurants & shops</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">🌿</div>
-            <div class="stat-label">Active Listings</div>
-            <div class="stat-val" id="ov-listings">—</div>
-            <div class="stat-sub">Products available now</div>
-          </div>
-          <div class="stat-card earth">
-            <div class="stat-icon">📦</div>
-            <div class="stat-label">Total Orders</div>
-            <div class="stat-val" id="ov-orders">—</div>
-            <div class="stat-sub">All time</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">💰</div>
-            <div class="stat-label">Platform Revenue</div>
-            <div class="stat-val" id="ov-revenue">—</div>
-            <div class="stat-sub">5% commission earned</div>
-          </div>
-          <div class="stat-card amber">
-            <div class="stat-icon">✉️</div>
-            <div class="stat-label">Messages</div>
-            <div class="stat-val" id="ov-messages">—</div>
-            <div class="stat-sub">Contact enquiries</div>
-          </div>
+          <div class="stat-card"><div class="stat-label">Total Farmers</div><div class="stat-val" id="ov-farmers">—</div><div class="stat-sub">Registered on platform</div></div>
+          <div class="stat-card amber"><div class="stat-label">Total Vendors</div><div class="stat-val" id="ov-vendors">—</div><div class="stat-sub">Restaurants & shops</div></div>
+          <div class="stat-card"><div class="stat-label">Active Listings</div><div class="stat-val" id="ov-listings">—</div><div class="stat-sub">Products available now</div></div>
+          <div class="stat-card earth"><div class="stat-label">Total Orders</div><div class="stat-val" id="ov-orders">—</div><div class="stat-sub">All time</div></div>
+          <div class="stat-card"><div class="stat-label">Platform Revenue</div><div class="stat-val" id="ov-revenue">—</div><div class="stat-sub">5% commission earned</div></div>
+          <div class="stat-card amber"><div class="stat-label">Messages</div><div class="stat-val" id="ov-messages">—</div><div class="stat-sub">Contact enquiries</div></div>
         </div>
-
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
           <div class="table-card">
-            <div class="table-header">
-              <div class="table-title">Recent Orders</div>
-              <span class="table-count" id="recent-orders-count">0</span>
-            </div>
-            <table>
-              <thead><tr><th>Product</th><th>Vendor</th><th>Total</th><th>Status</th></tr></thead>
-              <tbody id="recent-orders-body"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
-            </table>
+            <div class="table-header"><div class="table-title">Recent Orders</div><span class="table-count" id="ov-orders-count">0</span></div>
+            <table><thead><tr><th>Product</th><th>Vendor</th><th>Total</th><th>Status</th></tr></thead>
+            <tbody id="ov-orders-body"><tr class="loading-row"><td colspan="4">Loading…</td></tr></tbody></table>
           </div>
           <div class="table-card">
-            <div class="table-header">
-              <div class="table-title">Recent Signups</div>
-              <span class="table-count" id="recent-users-count">0</span>
-            </div>
-            <table>
-              <thead><tr><th>Name</th><th>Role</th><th>Region</th></tr></thead>
-              <tbody id="recent-users-body"><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
-            </table>
+            <div class="table-header"><div class="table-title">Recent Signups</div><span class="table-count" id="ov-signups-count">0</span></div>
+            <table><thead><tr><th>Name</th><th>Role</th><th>Region</th></tr></thead>
+            <tbody id="ov-signups-body"><tr class="loading-row"><td colspan="3">Loading…</td></tr></tbody></table>
           </div>
         </div>
       </div>
 
-      <!-- USERS PAGE -->
+      <!-- USERS -->
       <div class="page" id="page-users">
-        <div class="section-header">
-          <div><h2>All Users</h2><p>Farmers and vendors registered on the platform</p></div>
-        </div>
+        <div class="section-header"><div><h2>All Users</h2><p>Farmers and vendors on the platform</p></div></div>
         <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
           <div class="stat-card"><div class="stat-label">All Users</div><div class="stat-val" id="u-total">—</div></div>
           <div class="stat-card"><div class="stat-label">Farmers</div><div class="stat-val" id="u-farmers">—</div></div>
           <div class="stat-card amber"><div class="stat-label">Vendors</div><div class="stat-val" id="u-vendors">—</div></div>
         </div>
         <div class="table-card">
-          <div class="table-header">
-            <div class="table-title">User Directory</div>
-            <span class="table-count" id="users-count">0</span>
-          </div>
-          <table>
-            <thead><tr><th>User</th><th>Role</th><th>Phone</th><th>Region</th><th>Joined</th></tr></thead>
-            <tbody id="users-body"><tr><td colspan="5" class="loading">Loading users…</td></tr></tbody>
-          </table>
+          <div class="table-header"><div class="table-title">User Directory</div><span class="table-count" id="u-count">0</span></div>
+          <table><thead><tr><th>User</th><th>Role</th><th>Phone</th><th>Region</th><th>Joined</th></tr></thead>
+          <tbody id="u-body"><tr class="loading-row"><td colspan="5">Loading users…</td></tr></tbody></table>
         </div>
       </div>
 
-      <!-- LISTINGS PAGE -->
+      <!-- LISTINGS -->
       <div class="page" id="page-products">
-        <div class="section-header">
-          <div><h2>Product Listings</h2><p>All produce listed by farmers</p></div>
-        </div>
+        <div class="section-header"><div><h2>Product Listings</h2><p>All produce listed by farmers</p></div></div>
         <div class="table-card">
-          <div class="table-header">
-            <div class="table-title">All Listings</div>
-            <span class="table-count" id="products-count">0</span>
-          </div>
-          <table>
-            <thead><tr><th>Product</th><th>Farmer</th><th>Category</th><th>Price</th><th>Unit</th><th>Status</th></tr></thead>
-            <tbody id="products-body"><tr><td colspan="6" class="loading">Loading listings…</td></tr></tbody>
-          </table>
+          <div class="table-header"><div class="table-title">All Listings</div><span class="table-count" id="p-count">0</span></div>
+          <table><thead><tr><th>Product</th><th>Farmer</th><th>Category</th><th>Price</th><th>Unit</th><th>Status</th></tr></thead>
+          <tbody id="p-body"><tr class="loading-row"><td colspan="6">Loading listings…</td></tr></tbody></table>
         </div>
       </div>
 
-      <!-- ORDERS PAGE -->
+      <!-- ORDERS -->
       <div class="page" id="page-orders">
-        <div class="section-header">
-          <div><h2>All Orders</h2><p>Every transaction on the platform</p></div>
-        </div>
+        <div class="section-header"><div><h2>All Orders</h2><p>Every transaction on the platform</p></div></div>
         <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
           <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-val" id="o-total">—</div></div>
           <div class="stat-card amber"><div class="stat-label">Pending</div><div class="stat-val" id="o-pending">—</div></div>
           <div class="stat-card"><div class="stat-label">Confirmed</div><div class="stat-val" id="o-confirmed">—</div></div>
-          <div class="stat-card earth"><div class="stat-label">Commission Earned</div><div class="stat-val" id="o-commission">—</div></div>
+          <div class="stat-card earth"><div class="stat-label">Commission</div><div class="stat-val" id="o-commission">—</div></div>
         </div>
         <div class="table-card">
-          <div class="table-header">
-            <div class="table-title">Order Log</div>
-            <span class="table-count" id="orders-count">0</span>
-          </div>
-          <table>
-            <thead><tr><th>Product</th><th>Vendor</th><th>Qty</th><th>Subtotal</th><th>Fee (5%)</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
-            <tbody id="orders-body"><tr><td colspan="8" class="loading">Loading orders…</td></tr></tbody>
-          </table>
+          <div class="table-header"><div class="table-title">Order Log</div><span class="table-count" id="o-count">0</span></div>
+          <table><thead><tr><th>Product</th><th>Vendor</th><th>Qty</th><th>Subtotal</th><th>Fee (5%)</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
+          <tbody id="o-body"><tr class="loading-row"><td colspan="8">Loading orders…</td></tr></tbody></table>
         </div>
       </div>
 
-      <!-- MESSAGES PAGE -->
+      <!-- MESSAGES -->
       <div class="page" id="page-messages">
-        <div class="section-header">
-          <div><h2>Contact Messages</h2><p>Enquiries from farmers, vendors, and investors</p></div>
-        </div>
-        <div id="messages-body"><div class="loading">Loading messages…</div></div>
+        <div class="section-header"><div><h2>Contact Messages</h2><p>Enquiries from users</p></div></div>
+        <div id="m-body"><div style="text-align:center;padding:32px;color:var(--text-muted)">Loading messages…</div></div>
       </div>
 
     </div>
   </div>
 </div>
 
-
-<!-- USER PROFILE DRAWER -->
+<!-- DRAWER -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="user-drawer">
-  <div class="drawer-header">
+  <div class="drawer-head">
     <div style="font-size:14px;font-weight:600;color:var(--earth)" id="drawer-title">User Profile</div>
     <button class="drawer-close" onclick="closeDrawer()">✕</button>
   </div>
-  <div class="drawer-body" id="drawer-body">
-    <div class="loading">Loading…</div>
-  </div>
+  <div class="drawer-body" id="drawer-body"><div style="text-align:center;padding:32px;color:var(--text-muted)">Loading…</div></div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPABASE_URL = 'https://xfmxhetppwiwwfhbvvnl.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmbXhoZXRwcHdpd3dmaGJ2dm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA1NzYsImV4cCI6MjA5NzIwNjU3Nn0.t7_1cmBna9tEp-SQ4BemlZ5rQ2jsap5iBWqWbyxOhno';
-const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+var SUPA_URL = 'https://xfmxhetppwiwwfhbvvnl.supabase.co';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmbXhoZXRwcHdpd3dmaGJ2dm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA1NzYsImV4cCI6MjA5NzIwNjU3Nn0.t7_1cmBna9tEp-SQ4BemlZ5rQ2jsap5iBWqWbyxOhno';
+var ADMIN_EMAIL = 'alvincharles824@gmail.com';
+var db = supabase.createClient(SUPA_URL, SUPA_KEY);
+var currentPage = 'overview';
+var allUsers = [];
 
-// ===== ADMIN CONFIG =====
-// Change this to your admin email
-const ADMIN_EMAIL = 'alvincharles824@gmail.com';
-
-let currentPage = 'overview';
-
-// ===== AUTH =====
+// AUTH
 async function doAdminLogin() {
-  const email = document.getElementById('admin-email').value.trim();
-  const password = document.getElementById('admin-password').value;
-  const errEl = document.getElementById('login-error');
+  var email = document.getElementById('admin-email').value.trim();
+  var pass = document.getElementById('admin-password').value;
+  var errEl = document.getElementById('login-error');
   errEl.style.display = 'none';
-  if (!email || !password) { showError('Please enter email and password'); return; }
-  const { data, error } = await db.auth.signInWithPassword({ email, password });
-  if (error) { showError(error.message); return; }
-  if (data.user.email !== ADMIN_EMAIL) {
-    await db.auth.signOut();
-    showError('Access denied. Admin only.');
+  if (!email || !pass) { errEl.textContent = 'Please enter email and password'; errEl.style.display = 'block'; return; }
+  var btn = document.getElementById('login-btn');
+  btn.textContent = 'Signing in…';
+  btn.disabled = true;
+  var result = await db.auth.signInWithPassword({ email: email, password: pass });
+  if (result.error) {
+    errEl.textContent = result.error.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Sign in to dashboard';
+    btn.disabled = false;
     return;
   }
-  document.getElementById('admin-name').textContent = data.user.email.split('@')[0];
+  if (result.data.user.email !== ADMIN_EMAIL) {
+    await db.auth.signOut();
+    errEl.textContent = 'Access denied. Admin only.';
+    errEl.style.display = 'block';
+    btn.textContent = 'Sign in to dashboard';
+    btn.disabled = false;
+    return;
+  }
+  document.getElementById('admin-name').textContent = result.data.user.email.split('@')[0];
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   loadOverview();
 }
 
-function showError(msg) {
-  const el = document.getElementById('login-error');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
+document.getElementById('admin-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doAdminLogin();
+});
 
 async function doLogout() {
   await db.auth.signOut();
@@ -583,14 +344,14 @@ async function doLogout() {
   document.getElementById('app').style.display = 'none';
 }
 
-// ===== NAVIGATION =====
+// NAVIGATION
 function showPage(page, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
   document.getElementById('page-' + page).classList.add('active');
   btn.classList.add('active');
   currentPage = page;
-  const titles = {overview:'Overview',users:'Users',products:'Listings',orders:'Orders',messages:'Messages'};
+  var titles = { overview: 'Overview', users: 'Users', products: 'Listings', orders: 'Orders', messages: 'Messages' };
   document.getElementById('topbar-title').textContent = titles[page] || page;
   if (page === 'overview') loadOverview();
   if (page === 'users') loadUsers();
@@ -599,310 +360,187 @@ function showPage(page, btn) {
   if (page === 'messages') loadMessages();
 }
 
-function refreshCurrentPage() {
+function refreshPage() {
   if (currentPage === 'overview') loadOverview();
-  if (currentPage === 'users') loadUsers();
-  if (currentPage === 'products') loadProducts();
-  if (currentPage === 'orders') loadOrders();
-  if (currentPage === 'messages') loadMessages();
+  else if (currentPage === 'users') loadUsers();
+  else if (currentPage === 'products') loadProducts();
+  else if (currentPage === 'orders') loadOrders();
+  else if (currentPage === 'messages') loadMessages();
   showToast('Refreshed ✓');
 }
 
-// ===== OVERVIEW =====
+// STATUS BADGE
+function statusBadge(s) {
+  if (s === 'confirmed') return 'badge-green';
+  if (s === 'pending') return 'badge-amber';
+  if (s === 'delivered') return 'badge-blue';
+  return 'badge-earth';
+}
+
+// OVERVIEW
 async function loadOverview() {
-  const [
-    { count: farmers },
-    { count: vendors },
-    { count: listings },
-    { count: orders },
-    { data: orderData },
-    { count: messages },
-    { data: recentUsers }
-  ] = await Promise.all([
-    db.from('profiles').select('*',{count:'exact',head:true}).eq('role','farmer'),
-    db.from('profiles').select('*',{count:'exact',head:true}).eq('role','vendor'),
-    db.from('products').select('*',{count:'exact',head:true}).eq('available',true),
-    db.from('orders').select('*',{count:'exact',head:true}),
-    db.from('orders').select('platform_fee,total,created_at,products(name,emoji),profiles(full_name),status').order('created_at',{ascending:false}).limit(5),
-    db.from('contact_messages').select('*',{count:'exact',head:true}),
-    db.from('profiles').select('full_name,role,region,created_at').order('created_at',{ascending:false}).limit(5)
-  ]);
+  var r1 = await db.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'farmer');
+  var r2 = await db.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'vendor');
+  var r3 = await db.from('products').select('*', { count: 'exact', head: true }).eq('available', true);
+  var r4 = await db.from('orders').select('*', { count: 'exact', head: true });
+  var r5 = await db.from('orders').select('platform_fee,total,status,products(name,emoji),profiles(full_name)').order('created_at', { ascending: false }).limit(5);
+  var r6 = await db.from('contact_messages').select('*', { count: 'exact', head: true });
+  var r7 = await db.from('profiles').select('full_name,role,region,created_at').order('created_at', { ascending: false }).limit(5);
 
-  document.getElementById('ov-farmers').textContent = farmers || 0;
-  document.getElementById('ov-vendors').textContent = vendors || 0;
-  document.getElementById('ov-listings').textContent = listings || 0;
-  document.getElementById('ov-orders').textContent = orders || 0;
-  document.getElementById('ov-messages').textContent = messages || 0;
+  document.getElementById('ov-farmers').textContent = r1.count || 0;
+  document.getElementById('ov-vendors').textContent = r2.count || 0;
+  document.getElementById('ov-listings').textContent = r3.count || 0;
+  document.getElementById('ov-orders').textContent = r4.count || 0;
+  document.getElementById('ov-messages').textContent = r6.count || 0;
 
-  // Calculate revenue
-  const revenue = orderData?.reduce((s, o) => s + (o.platform_fee || 0), 0) || 0;
+  var revenue = (r5.data || []).reduce(function(s, o) { return s + (o.platform_fee || 0); }, 0);
   document.getElementById('ov-revenue').textContent = 'TZS ' + revenue.toLocaleString();
 
-  // Recent orders
-  const rob = document.getElementById('recent-orders-body');
-  document.getElementById('recent-orders-count').textContent = orderData?.length || 0;
-  if (!orderData || orderData.length === 0) {
-    rob.innerHTML = '<tr><td colspan="4" class="empty-row">No orders yet</td></tr>';
+  var ob = document.getElementById('ov-orders-body');
+  document.getElementById('ov-orders-count').textContent = (r5.data || []).length;
+  if (!r5.data || !r5.data.length) {
+    ob.innerHTML = '<tr class="empty-row"><td colspan="4">No orders yet</td></tr>';
   } else {
-    rob.innerHTML = orderData.map(o => `
-      <tr>
-        <td>${o.products?.emoji || '🌿'} ${o.products?.name || '—'}</td>
-        <td>${o.profiles?.full_name || '—'}</td>
-        <td style="font-weight:600;color:var(--green)">TZS ${Number(o.total).toLocaleString()}</td>
-        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
-      </tr>`).join('');
+    ob.innerHTML = r5.data.map(function(o) {
+      return '<tr><td>' + (o.products ? o.products.emoji + ' ' + o.products.name : '—') + '</td><td>' + (o.profiles ? o.profiles.full_name : '—') + '</td><td style="color:var(--green);font-weight:600">TZS ' + Number(o.total).toLocaleString() + '</td><td><span class="badge ' + statusBadge(o.status) + '">' + o.status + '</span></td></tr>';
+    }).join('');
   }
 
-  // Recent users
-  const rub = document.getElementById('recent-users-body');
-  document.getElementById('recent-users-count').textContent = recentUsers?.length || 0;
-  if (!recentUsers || recentUsers.length === 0) {
-    rub.innerHTML = '<tr><td colspan="3" class="empty-row">No users yet</td></tr>';
+  var sb = document.getElementById('ov-signups-body');
+  document.getElementById('ov-signups-count').textContent = (r7.data || []).length;
+  if (!r7.data || !r7.data.length) {
+    sb.innerHTML = '<tr class="empty-row"><td colspan="3">No users yet</td></tr>';
   } else {
-    rub.innerHTML = recentUsers.map(u => `
-      <tr>
-        <td><div class="user-cell"><div class="user-avatar ${u.role==='farmer'?'farmer-av':'vendor-av'}">${(u.full_name||'?')[0].toUpperCase()}</div><div class="user-name">${u.full_name || '—'}</div></div></td>
-        <td><span class="badge ${u.role==='farmer'?'badge-green':'badge-amber'}">${u.role}</span></td>
-        <td>${u.region || '—'}</td>
-      </tr>`).join('');
+    sb.innerHTML = r7.data.map(function(u) {
+      return '<tr><td><div class="user-cell"><div class="u-av ' + (u.role === 'farmer' ? 'farmer-av' : 'vendor-av') + '">' + (u.full_name || '?')[0].toUpperCase() + '</div><div class="u-name">' + (u.full_name || '—') + '</div></div></td><td><span class="badge ' + (u.role === 'farmer' ? 'badge-green' : 'badge-amber') + '">' + (u.role || '—') + '</span></td><td>' + (u.region || '—') + '</td></tr>';
+    }).join('');
   }
 }
 
-// ===== USERS =====
-let _allUsers = [];
+// USERS
 async function loadUsers() {
-  const { data } = await db.from('profiles').select('*').order('created_at', { ascending: false });
-  _allUsers = data || [];
-  const farmers = _allUsers.filter(u => u.role === 'farmer').length;
-  const vendors = _allUsers.filter(u => u.role === 'vendor').length;
-  document.getElementById('u-total').textContent = _allUsers.length;
+  var result = await db.from('profiles').select('*').order('created_at', { ascending: false });
+  allUsers = result.data || [];
+  var farmers = allUsers.filter(function(u) { return u.role === 'farmer'; }).length;
+  var vendors = allUsers.filter(function(u) { return u.role === 'vendor'; }).length;
+  document.getElementById('u-total').textContent = allUsers.length;
   document.getElementById('u-farmers').textContent = farmers;
   document.getElementById('u-vendors').textContent = vendors;
-  document.getElementById('users-count').textContent = _allUsers.length;
-  const body = document.getElementById('users-body');
-  if (!_allUsers.length) {
-    body.innerHTML = '<tr><td colspan="5" class="empty-row">No users registered yet</td></tr>';
+  document.getElementById('u-count').textContent = allUsers.length;
+  var body = document.getElementById('u-body');
+  if (!allUsers.length) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="5">No users registered yet</td></tr>';
     return;
   }
-  body.innerHTML = _allUsers.map((u, i) => `
-    <tr class="clickable-row" onclick="openUserDrawer(${i})">
-      <td><div class="user-cell">
-        <div class="user-avatar ${u.role==='farmer'?'farmer-av':'vendor-av'}">${(u.full_name||'?')[0].toUpperCase()}</div>
-        <div><div class="user-name">${u.full_name || '—'}</div><div class="user-email">${u.email || ''}</div></div>
-      </div></td>
-      <td><span class="badge ${u.role==='farmer'?'badge-green':'badge-amber'}">${u.role}</span></td>
-      <td>${u.phone || '—'}</td>
-      <td>${u.region || '—'}</td>
-      <td>${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—'} <span style="font-size:11px;color:var(--green);margin-left:6px">View →</span></td>
-    </tr>`).join('');
-
-
-// ===== PRODUCTS =====
-async function loadProducts() {
-  const { data } = await db.from('products').select('*, profiles(full_name)').order('created_at', { ascending: false });
-  document.getElementById('products-count').textContent = data?.length || 0;
-  const body = document.getElementById('products-body');
-  if (!data || data.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" class="empty-row">No listings yet</td></tr>';
-    return;
-  }
-  body.innerHTML = data.map(p => `
-    <tr>
-      <td><strong>${p.emoji || '🌿'} ${p.name}</strong></td>
-      <td>${p.profiles?.full_name || '—'}</td>
-      <td><span class="badge badge-earth">${p.category}</span></td>
-      <td style="font-weight:600;color:var(--green)">TZS ${Number(p.price).toLocaleString()}</td>
-      <td>${p.unit}</td>
-      <td><span class="badge ${p.available?'badge-green':'badge-red'}">${p.available?'Active':'Inactive'}</span></td>
-    </tr>`).join('');
+  body.innerHTML = allUsers.map(function(u, i) {
+    return '<tr class="clickable-row" onclick="openDrawer(' + i + ')"><td><div class="user-cell"><div class="u-av ' + (u.role === 'farmer' ? 'farmer-av' : 'vendor-av') + '">' + (u.full_name || '?')[0].toUpperCase() + '</div><div><div class="u-name">' + (u.full_name || '—') + '</div><div class="u-email">' + (u.email || '') + '</div></div></div></td><td><span class="badge ' + (u.role === 'farmer' ? 'badge-green' : 'badge-amber') + '">' + (u.role || '—') + '</span></td><td>' + (u.phone || '—') + '</td><td>' + (u.region || '—') + '</td><td>' + (u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '—') + ' <span style="font-size:11px;color:var(--green)">View →</span></td></tr>';
+  }).join('');
 }
 
-// ===== ORDERS =====
+// PRODUCTS
+async function loadProducts() {
+  var result = await db.from('products').select('*, profiles(full_name)').order('created_at', { ascending: false });
+  var data = result.data || [];
+  document.getElementById('p-count').textContent = data.length;
+  var body = document.getElementById('p-body');
+  if (!data.length) { body.innerHTML = '<tr class="empty-row"><td colspan="6">No listings yet</td></tr>'; return; }
+  body.innerHTML = data.map(function(p) {
+    return '<tr><td><strong>' + (p.emoji || '🌿') + ' ' + p.name + '</strong></td><td>' + (p.profiles ? p.profiles.full_name : '—') + '</td><td><span class="badge badge-earth">' + (p.category || '—') + '</span></td><td style="color:var(--green);font-weight:600">TZS ' + Number(p.price).toLocaleString() + '</td><td>' + (p.unit || '—') + '</td><td><span class="badge ' + (p.available ? 'badge-green' : 'badge-red') + '">' + (p.available ? 'Active' : 'Inactive') + '</span></td></tr>';
+  }).join('');
+}
+
+// ORDERS
 async function loadOrders() {
-  const { data } = await db.from('orders').select('*, products(name,emoji), profiles(full_name)').order('created_at', { ascending: false });
-  const pending = data?.filter(o => o.status === 'pending').length || 0;
-  const confirmed = data?.filter(o => o.status === 'confirmed').length || 0;
-  const commission = data?.reduce((s, o) => s + (o.platform_fee || 0), 0) || 0;
-  document.getElementById('o-total').textContent = data?.length || 0;
+  var result = await db.from('orders').select('*, products(name,emoji), profiles(full_name)').order('created_at', { ascending: false });
+  var data = result.data || [];
+  var pending = data.filter(function(o) { return o.status === 'pending'; }).length;
+  var confirmed = data.filter(function(o) { return o.status === 'confirmed'; }).length;
+  var commission = data.reduce(function(s, o) { return s + (o.platform_fee || 0); }, 0);
+  document.getElementById('o-total').textContent = data.length;
   document.getElementById('o-pending').textContent = pending;
   document.getElementById('o-confirmed').textContent = confirmed;
   document.getElementById('o-commission').textContent = 'TZS ' + commission.toLocaleString();
-  document.getElementById('orders-count').textContent = data?.length || 0;
-  const body = document.getElementById('orders-body');
-  if (!data || data.length === 0) {
-    body.innerHTML = '<tr><td colspan="8" class="empty-row">No orders yet</td></tr>';
-    return;
-  }
-  body.innerHTML = data.map(o => `
-    <tr>
-      <td>${o.products?.emoji || '🌿'} ${o.products?.name || '—'}</td>
-      <td>${o.profiles?.full_name || '—'}</td>
-      <td>${o.quantity}</td>
-      <td>TZS ${Number(o.subtotal).toLocaleString()}</td>
-      <td style="color:var(--amber);font-weight:600">TZS ${Number(o.platform_fee).toLocaleString()}</td>
-      <td style="font-weight:600;color:var(--green)">TZS ${Number(o.total).toLocaleString()}</td>
-      <td>${o.payment_method || '—'}</td>
-      <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
-    </tr>`).join('');
+  document.getElementById('o-count').textContent = data.length;
+  var body = document.getElementById('o-body');
+  if (!data.length) { body.innerHTML = '<tr class="empty-row"><td colspan="8">No orders yet</td></tr>'; return; }
+  body.innerHTML = data.map(function(o) {
+    return '<tr><td>' + (o.products ? o.products.emoji + ' ' + o.products.name : '—') + '</td><td>' + (o.profiles ? o.profiles.full_name : '—') + '</td><td>' + (o.quantity || 1) + '</td><td>TZS ' + Number(o.subtotal).toLocaleString() + '</td><td style="color:var(--amber);font-weight:600">TZS ' + Number(o.platform_fee).toLocaleString() + '</td><td style="color:var(--green);font-weight:600">TZS ' + Number(o.total).toLocaleString() + '</td><td>' + (o.payment_method || '—') + '</td><td><span class="badge ' + statusBadge(o.status) + '">' + o.status + '</span></td></tr>';
+  }).join('');
 }
 
-// ===== MESSAGES =====
+// MESSAGES
 async function loadMessages() {
-  const { data } = await db.from('contact_messages').select('*').order('created_at', { ascending: false });
-  document.getElementById('ov-messages').textContent = data?.length || 0;
-  const container = document.getElementById('messages-body');
-  if (!data || data.length === 0) {
-    container.innerHTML = '<div class="loading">No messages yet</div>';
-    return;
-  }
-  container.innerHTML = data.map(m => `
-    <div class="msg-card">
-      <div class="msg-header">
-        <div class="msg-name">${m.name || '—'}</div>
-        <span class="badge badge-earth">${m.role || 'Unknown'}</span>
-      </div>
-      <div class="msg-phone">📱 ${m.phone || '—'}</div>
-      <div class="msg-body">${m.message || '(no message)'}</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:8px">${m.created_at ? new Date(m.created_at).toLocaleString('en-GB') : ''}</div>
-    </div>`).join('');
+  var result = await db.from('contact_messages').select('*').order('created_at', { ascending: false });
+  var data = result.data || [];
+  var container = document.getElementById('m-body');
+  if (!data.length) { container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted)">No messages yet</div>'; return; }
+  container.innerHTML = data.map(function(m) {
+    return '<div class="msg-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div class="msg-name">' + (m.name || '—') + '</div><span class="badge badge-earth">' + (m.role || 'Unknown') + '</span></div><div class="msg-phone">📱 ' + (m.phone || '—') + '</div><div class="msg-body">' + (m.message || '(no message)') + '</div><div style="font-size:11px;color:var(--text-muted);margin-top:8px">' + (m.created_at ? new Date(m.created_at).toLocaleString('en-GB') : '') + '</div></div>';
+  }).join('');
 }
 
-// ===== HELPERS =====
-function statusBadge(status) {
-  return {pending:'badge-amber',confirmed:'badge-green',delivered:'badge-blue'}[status] || 'badge-earth';
-}
-
-function showToast(msg, type='') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (type === 'error' ? ' error' : '') + ' show';
-  setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-// Check if already logged in
-db.auth.getSession().then(({ data: { session } }) => {
-  if (session && session.user.email === ADMIN_EMAIL) {
-    document.getElementById('admin-name').textContent = session.user.email.split('@')[0];
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    loadOverview();
-  }
-});
-
-// ===== USER PROFILE DRAWER =====
-async function openUserDrawer(idx) {
-  const u = _allUsers[idx];
+// DRAWER
+async function openDrawer(idx) {
+  var u = allUsers[idx];
   if (!u) return;
-  const id = u.id, name = u.full_name, role = u.role, email = u.email, phone = u.phone, region = u.region;
   document.getElementById('drawer-overlay').classList.add('open');
   document.getElementById('user-drawer').classList.add('open');
-  document.getElementById('drawer-title').textContent = name || 'User Profile';
-  document.getElementById('drawer-body').innerHTML = '<div class="loading">Loading profile…</div>';
+  document.getElementById('drawer-title').textContent = u.full_name || 'User Profile';
+  document.getElementById('drawer-body').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted)">Loading profile…</div>';
 
-  const isFarmer = role === 'farmer';
-  let statsHtml = '';
-  let activityHtml = '';
+  var isFarmer = u.role === 'farmer';
+  var statsHtml = '';
+  var activityHtml = '';
 
   if (isFarmer) {
-    // Load farmer products and orders
-    const { data: products } = await db.from('products').select('*').eq('farmer_id', id).order('created_at', {ascending: false});
-    const productIds = (products || []).map(p => p.id);
-    let orders = [];
-    let totalEarned = 0;
-    let totalFees = 0;
-    if (productIds.length > 0) {
-      const { data: ord } = await db.from('orders').select('*, products(name,emoji), profiles(full_name)').in('product_id', productIds).order('created_at', {ascending: false});
-      orders = ord || [];
-      totalEarned = orders.reduce((s,o) => s + (o.subtotal - o.platform_fee), 0);
-      totalFees = orders.reduce((s,o) => s + o.platform_fee, 0);
+    var pr = await db.from('products').select('*').eq('farmer_id', u.id).order('created_at', { ascending: false });
+    var products = pr.data || [];
+    var orders = [];
+    var totalEarned = 0;
+    var totalFees = 0;
+    if (products.length) {
+      var ids = products.map(function(p) { return p.id; });
+      var or = await db.from('orders').select('*, profiles(full_name)').in('product_id', ids).order('created_at', { ascending: false });
+      orders = or.data || [];
+      totalEarned = orders.reduce(function(s, o) { return s + (o.subtotal - o.platform_fee); }, 0);
+      totalFees = orders.reduce(function(s, o) { return s + (o.platform_fee || 0); }, 0);
     }
+    statsHtml = '<div class="d-stats"><div class="d-stat"><div class="d-stat-label">Listings</div><div class="d-stat-val">' + products.length + '</div></div><div class="d-stat"><div class="d-stat-label">Orders received</div><div class="d-stat-val">' + orders.length + '</div></div><div class="d-stat"><div class="d-stat-label">Earned</div><div class="d-stat-val" style="font-size:13px;color:var(--green)">TZS ' + totalEarned.toLocaleString() + '</div></div><div class="d-stat"><div class="d-stat-label">Platform fees</div><div class="d-stat-val" style="font-size:13px;color:var(--amber)">TZS ' + totalFees.toLocaleString() + '</div></div></div>';
 
-    statsHtml = `
-      <div class="drawer-stats">
-        <div class="drawer-stat"><div class="drawer-stat-label">Listings</div><div class="drawer-stat-val">${products?.length || 0}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Orders received</div><div class="drawer-stat-val">${orders.length}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Total earned</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalEarned.toLocaleString()}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalFees.toLocaleString()}</div></div>
-      </div>`;
+    var pRows = products.length ? products.map(function(p) {
+      return '<tr><td>' + (p.emoji || '🌿') + ' ' + p.name + '</td><td><span class="badge badge-earth">' + (p.category || '') + '</span></td><td style="color:var(--green);font-weight:600">TZS ' + Number(p.price).toLocaleString() + '</td><td>' + p.unit + '</td><td><span class="badge ' + (p.available ? 'badge-green' : 'badge-red') + '">' + (p.available ? 'Active' : 'Off') + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="5" class="d-empty">No listings yet</td></tr>';
 
-    const listingsRows = products?.length ? products.map(p => `
-      <tr>
-        <td>${p.emoji||'🌿'} ${p.name}</td>
-        <td><span class="badge badge-earth">${p.category}</span></td>
-        <td style="color:var(--green);font-weight:600">TZS ${Number(p.price).toLocaleString()}</td>
-        <td>${p.unit}</td>
-        <td><span class="badge ${p.available?'badge-green':'badge-red'}">${p.available?'Active':'Off'}</span></td>
-      </tr>`).join('') : `<tr><td colspan="5" class="drawer-empty">No listings yet</td></tr>`;
+    var oRows = orders.length ? orders.slice(0, 10).map(function(o) {
+      return '<tr><td>' + (o.profiles ? o.profiles.full_name : 'Vendor') + '</td><td>TZS ' + Number(o.total).toLocaleString() + '</td><td><span class="badge ' + statusBadge(o.status) + '">' + o.status + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="3" class="d-empty">No orders yet</td></tr>';
 
-    const orderRows = orders.length ? orders.slice(0,10).map(o => `
-      <tr>
-        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
-        <td>${o.profiles?.full_name||'Vendor'}</td>
-        <td>TZS ${Number(o.total).toLocaleString()}</td>
-        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
-      </tr>`).join('') : `<tr><td colspan="4" class="drawer-empty">No orders yet</td></tr>`;
-
-    activityHtml = `
-      <div class="drawer-section">
-        <div class="drawer-section-title">Product Listings (${products?.length||0})</div>
-        <table class="drawer-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Unit</th><th>Status</th></tr></thead>
-        <tbody>${listingsRows}</tbody></table>
-      </div>
-      <div class="drawer-section">
-        <div class="drawer-section-title">Orders Received (${orders.length})</div>
-        <table class="drawer-table"><thead><tr><th>Product</th><th>Vendor</th><th>Total</th><th>Status</th></tr></thead>
-        <tbody>${orderRows}</tbody></table>
-      </div>`;
+    activityHtml = '<div class="d-section"><div class="d-section-title">Listings (' + products.length + ')</div><table class="d-table"><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Unit</th><th>Status</th></tr></thead><tbody>' + pRows + '</tbody></table></div><div class="d-section"><div class="d-section-title">Orders Received (' + orders.length + ')</div><table class="d-table"><thead><tr><th>Vendor</th><th>Total</th><th>Status</th></tr></thead><tbody>' + oRows + '</tbody></table></div>';
 
   } else {
-    // Load vendor orders
-    const { data: orders } = await db.from('orders').select('*, products(name,emoji,profiles(full_name))').eq('vendor_id', id).order('created_at', {ascending: false});
-    const totalSpent = (orders||[]).reduce((s,o) => s + o.total, 0);
-    const totalFees = (orders||[]).reduce((s,o) => s + o.platform_fee, 0);
+    var vr = await db.from('orders').select('*, products(name,emoji,profiles(full_name))').eq('vendor_id', u.id).order('created_at', { ascending: false });
+    var vOrders = vr.data || [];
+    var totalSpent = vOrders.reduce(function(s, o) { return s + (o.total || 0); }, 0);
+    var totalFees2 = vOrders.reduce(function(s, o) { return s + (o.platform_fee || 0); }, 0);
 
-    statsHtml = `
-      <div class="drawer-stats">
-        <div class="drawer-stat"><div class="drawer-stat-label">Orders placed</div><div class="drawer-stat-val">${orders?.length||0}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Total spent</div><div class="drawer-stat-val" style="font-size:14px;color:var(--amber)">TZS ${totalSpent.toLocaleString()}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Platform fees paid</div><div class="drawer-stat-val" style="font-size:14px;color:var(--green)">TZS ${totalFees.toLocaleString()}</div></div>
-        <div class="drawer-stat"><div class="drawer-stat-label">Avg order</div><div class="drawer-stat-val" style="font-size:14px">${orders?.length ? 'TZS '+(totalSpent/orders.length).toLocaleString(undefined,{maximumFractionDigits:0}) : '—'}</div></div>
-      </div>`;
+    statsHtml = '<div class="d-stats"><div class="d-stat"><div class="d-stat-label">Orders placed</div><div class="d-stat-val">' + vOrders.length + '</div></div><div class="d-stat"><div class="d-stat-label">Total spent</div><div class="d-stat-val" style="font-size:13px;color:var(--amber)">TZS ' + totalSpent.toLocaleString() + '</div></div><div class="d-stat"><div class="d-stat-label">Fees paid</div><div class="d-stat-val" style="font-size:13px;color:var(--green)">TZS ' + totalFees2.toLocaleString() + '</div></div><div class="d-stat"><div class="d-stat-label">Avg order</div><div class="d-stat-val" style="font-size:13px">' + (vOrders.length ? 'TZS ' + Math.round(totalSpent / vOrders.length).toLocaleString() : '—') + '</div></div></div>';
 
-    const orderRows = orders?.length ? orders.map(o => `
-      <tr>
-        <td>${o.products?.emoji||'🌿'} ${o.products?.name||'—'}</td>
-        <td>${o.products?.profiles?.full_name||'Farmer'}</td>
-        <td>${o.quantity}</td>
-        <td style="color:var(--green);font-weight:600">TZS ${Number(o.total).toLocaleString()}</td>
-        <td>${o.payment_method||'—'}</td>
-        <td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td>
-      </tr>`).join('') : `<tr><td colspan="6" class="drawer-empty">No orders yet</td></tr>`;
+    var voRows = vOrders.length ? vOrders.map(function(o) {
+      return '<tr><td>' + (o.products ? o.products.emoji + ' ' + o.products.name : '—') + '</td><td>' + (o.products && o.products.profiles ? o.products.profiles.full_name : 'Farmer') + '</td><td>' + (o.quantity || 1) + '</td><td style="color:var(--green);font-weight:600">TZS ' + Number(o.total).toLocaleString() + '</td><td><span class="badge ' + statusBadge(o.status) + '">' + o.status + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="5" class="d-empty">No orders yet</td></tr>';
 
-    activityHtml = `
-      <div class="drawer-section">
-        <div class="drawer-section-title">Order History (${orders?.length||0})</div>
-        <table class="drawer-table"><thead><tr><th>Product</th><th>Farmer</th><th>Qty</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
-        <tbody>${orderRows}</tbody></table>
-      </div>`;
+    activityHtml = '<div class="d-section"><div class="d-section-title">Order History (' + vOrders.length + ')</div><table class="d-table"><thead><tr><th>Product</th><th>Farmer</th><th>Qty</th><th>Total</th><th>Status</th></tr></thead><tbody>' + voRows + '</tbody></table></div>';
   }
 
-  const avatarColor = isFarmer ? 'var(--green)' : 'var(--amber)';
-  const initial = (name||'?')[0].toUpperCase();
+  var color = isFarmer ? 'var(--green)' : 'var(--amber)';
+  var initial = (u.full_name || '?')[0].toUpperCase();
 
-  document.getElementById('drawer-body').innerHTML = `
-    <div class="drawer-avatar" style="background:${avatarColor}">${initial}</div>
-    <div class="drawer-name">${name||'—'}</div>
-    <div class="drawer-meta">
-      <span>📧 ${email||'—'}</span>
-      <span>📱 ${phone||'—'}</span>
-      <span>📍 ${region||'—'}</span>
-    </div>
-    <div style="margin-bottom:20px">
-      <span class="badge ${isFarmer?'badge-green':'badge-amber'}" style="font-size:13px;padding:5px 14px">${isFarmer?'🌾 Farmer':'🍽️ Vendor'}</span>
-    </div>
-    ${statsHtml}
-    ${activityHtml}
-  `;
+  document.getElementById('drawer-body').innerHTML =
+    '<div class="d-avatar" style="background:' + color + '">' + initial + '</div>' +
+    '<div class="d-name">' + (u.full_name || '—') + '</div>' +
+    '<div class="d-meta">📧 ' + (u.email || '—') + ' &nbsp;|&nbsp; 📱 ' + (u.phone || '—') + ' &nbsp;|&nbsp; 📍 ' + (u.region || '—') + '</div>' +
+    '<div style="margin-bottom:16px"><span class="badge ' + (isFarmer ? 'badge-green' : 'badge-amber') + '" style="font-size:13px;padding:5px 14px">' + (isFarmer ? '🌾 Farmer' : '🍽️ Vendor') + '</span></div>' +
+    statsHtml + activityHtml;
 }
 
 function closeDrawer() {
@@ -910,6 +548,22 @@ function closeDrawer() {
   document.getElementById('user-drawer').classList.remove('open');
 }
 
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+// Check existing session
+db.auth.getSession().then(function(result) {
+  if (result.data.session && result.data.session.user.email === ADMIN_EMAIL) {
+    document.getElementById('admin-name').textContent = result.data.session.user.email.split('@')[0];
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    loadOverview();
+  }
+});
 </script>
 </body>
 </html>
