@@ -231,6 +231,17 @@ footer{background:var(--earth);color:#fff;padding:48px 5% 24px}
   .form-row{grid-template-columns:1fr}
   .footer-bottom{flex-direction:column;gap:8px;text-align:center}
 }
+
+/* SUBSCRIPTION BANNER */
+.sub-banner{padding:14px 16px;border-radius:10px;font-size:13px;margin-bottom:20px;line-height:1.6}
+.sub-info{background:#E6F1FB;color:#185FA5;border:1px solid #BBD9F2}
+.sub-active{background:var(--green-light,#E1F5EE);color:#0F6E56;border:1px solid #B5E5D6}
+.sub-warn{background:#FAEEDA;color:#BA7517;border:1px solid #F0D9A8}
+.sub-danger{background:#FEE2E2;color:#dc2626;border:1px solid #FBC8C8}
+.payment-box{margin-top:12px;background:#fff;border:1px solid var(--border,#d4d0c8);border-radius:8px;padding:14px}
+.payment-title{font-weight:600;font-size:13px;margin-bottom:8px;color:#1a1a1a}
+.payment-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;color:#1a1a1a}
+.payment-note{font-size:12px;color:#6b6b6b;margin-top:8px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -594,10 +605,11 @@ footer{background:var(--earth);color:#fff;padding:48px 5% 24px}
     </div>
     <!-- VENDOR DASH -->
     <div id="vendor-dash" style="display:none">
+      <div id="sub-status-banner"></div>
       <div class="stat-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:28px">
         <div class="stat"><div class="stat-label">Orders placed</div><div class="stat-val" id="my-vendor-orders">0</div></div>
         <div class="stat"><div class="stat-label">Total spent</div><div class="stat-val" id="my-vendor-spent">TZS 0</div></div>
-        <div class="stat"><div class="stat-label">Subscription</div><div class="stat-val" style="font-size:15px">Basic</div></div>
+        <div class="stat"><div class="stat-label">Subscription</div><div class="stat-val" id="my-vendor-plan" style="font-size:15px">—</div></div>
       </div>
       <div class="dash-section">
         <div class="dash-section-title">My orders</div>
@@ -701,7 +713,9 @@ async function loadProducts(category='all') {
     container.innerHTML = getSampleProducts(category);
     return;
   }
-  container.innerHTML = data.map(p => `
+  container.innerHTML = data.map(p => {
+    const displayPrice = Math.round(p.price * 1.10);
+    return `
     <div class="product-card" data-cat="${p.category}">
       <div class="product-img" style="background:${getCatColor(p.category)}">${p.emoji||'🌿'}</div>
       <div class="product-body">
@@ -709,11 +723,12 @@ async function loadProducts(category='all') {
         <div class="product-name">${p.name}</div>
         <div class="product-farmer">📍 ${p.profiles?.full_name||'Farmer'}, ${p.profiles?.region||'Tanzania'} · ${p.unit}</div>
         <div class="product-footer">
-          <div class="product-price">TZS ${Number(p.price).toLocaleString()}</div>
-          <button class="order-btn" onclick="openOrder('${p.id}','${p.name}',${p.price},'${p.profiles?.full_name||'Farmer'}','${p.unit}')">Order</button>
+          <div class="product-price">TZS ${displayPrice.toLocaleString()}</div>
+          <button class="order-btn" onclick="openOrder('${p.id}','${p.name}',${displayPrice},'${p.profiles?.full_name||'Farmer'}','${p.unit}')">Order</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function getSampleProducts(cat) {
@@ -800,7 +815,7 @@ async function confirmOrder() {
 }
 
 // ===== DASHBOARD =====
-function openDashboard() {
+async function openDashboard() {
   if (!currentUser||!currentProfile) { showToast('Please login first','error'); return; }
   document.getElementById('user-dashboard').classList.add('open');
   document.getElementById('dash-title').textContent = currentProfile.role==='farmer' ? '🌾 Farmer Dashboard' : '🍽️ Vendor Dashboard';
@@ -814,7 +829,74 @@ function openDashboard() {
     document.getElementById('farmer-dash').style.display='none';
     document.getElementById('vendor-dash').style.display='block';
     loadVendorOrders();
+    checkVendorSubscription();
   }
+}
+
+// ===== VENDOR SUBSCRIPTION =====
+const PLATFORM_MOMO_NUMBER = '+255 793 049 909'; // Your mobile money number
+const PLAN_PRICES = { basic: 25000, pro: 55000 };
+
+async function checkVendorSubscription() {
+  const { data: sub } = await db.from('subscriptions').select('*').eq('vendor_id', currentUser.id).single();
+  const banner = document.getElementById('sub-status-banner');
+  if (!banner) return;
+
+  if (!sub) {
+    banner.innerHTML = `<div class="sub-banner sub-warn">No subscription found. Please contact support.</div>`;
+    return;
+  }
+
+  const now = new Date();
+  let isBlocked = false;
+  let html = '';
+
+  const planLabel = document.getElementById('my-vendor-plan');
+  if (planLabel) planLabel.textContent = (sub.plan==='pro'?'Pro':'Basic') + (sub.status==='trial'?' (Trial)':'');
+
+  if (sub.status === 'trial') {
+    const trialEnd = new Date(sub.trial_ends_at);
+    const daysLeft = Math.ceil((trialEnd - now) / (1000*60*60*24));
+    if (daysLeft <= 0) {
+      isBlocked = true;
+      html = `<div class="sub-banner sub-danger">⚠️ Your free trial has ended. Subscribe now to continue using Agri Link.${renderPaymentInstructions()}</div>`;
+    } else {
+      html = `<div class="sub-banner sub-info">🎉 You're on a free trial — ${daysLeft} day${daysLeft===1?'':'s'} left.</div>`;
+    }
+  } else if (sub.status === 'active') {
+    const periodEnd = new Date(sub.current_period_end);
+    const daysLeft = Math.ceil((periodEnd - now) / (1000*60*60*24));
+    if (daysLeft <= 0) {
+      isBlocked = true;
+      html = `<div class="sub-banner sub-danger">⚠️ Your ${sub.plan} subscription has expired. Renew to continue.${renderPaymentInstructions(sub.plan)}</div>`;
+    } else {
+      html = `<div class="sub-banner sub-active">✅ ${sub.plan==='pro'?'Pro':'Basic'} plan active — renews in ${daysLeft} day${daysLeft===1?'':'s'}.</div>`;
+    }
+  } else if (sub.status === 'expired' || sub.status === 'cancelled') {
+    isBlocked = true;
+    html = `<div class="sub-banner sub-danger">⚠️ Your subscription is inactive. Subscribe to continue ordering.${renderPaymentInstructions()}</div>`;
+  }
+
+  banner.innerHTML = html;
+
+  // Block ordering features if subscription lapsed
+  document.querySelectorAll('.order-btn').forEach(btn => {
+    btn.disabled = isBlocked;
+    if (isBlocked) btn.title = 'Subscription required to order';
+  });
+}
+
+function renderPaymentInstructions(plan) {
+  const p = plan || 'basic';
+  const amount = PLAN_PRICES[p];
+  return `
+    <div class="payment-box">
+      <div class="payment-title">📱 Pay via Mobile Money</div>
+      <div class="payment-row"><span>Send to:</span><strong>${PLATFORM_MOMO_NUMBER}</strong></div>
+      <div class="payment-row"><span>Amount:</span><strong>TZS ${amount.toLocaleString()}</strong> (${p==='pro'?'Pro':'Basic'} plan)</div>
+      <div class="payment-row"><span>Reference:</span><strong>${currentProfile?.full_name||''}</strong></div>
+      <div class="payment-note">After payment, message us your transaction ID and we'll activate your account within a few hours.</div>
+    </div>`;
 }
 
 function closeDashboard() {
