@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>Landa Driver App</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--accent:#2d6a4f;--accent2:#52b788;--accent3:#f77f00;--text:#e6edf3;--muted:#7d8590;--green:#3fb950;--red:#f85149;--blue:#58a6ff;--yellow:#d29922;--purple:#bc8cff;--font:'Plus Jakarta Sans',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;max-width:430px;margin:0 auto;}
+
+/* LOGIN */
+.login-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,#1b4332,#0d1117);}
+.login-icon{font-size:3.5rem;margin-bottom:8px;}
+.login-title{font-size:1.5rem;font-weight:800;color:var(--accent2);margin-bottom:4px;}
+.login-sub{color:var(--muted);font-size:.85rem;margin-bottom:28px;}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px;width:100%;}
+.hint{background:rgba(82,183,136,.1);border:1px solid rgba(82,183,136,.3);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.74rem;color:var(--accent2);line-height:1.5;}
+.fg{margin-bottom:13px;}
+.fg label{display:block;font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:4px;}
+.fg input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px;color:var(--text);font-family:var(--font);font-size:.95rem;outline:none;}
+.fg input:focus{border-color:var(--accent2);}
+.btn-login{width:100%;background:var(--accent);border:none;border-radius:13px;padding:15px;color:#fff;font-family:var(--font);font-weight:800;font-size:1rem;cursor:pointer;}
+
+/* APP */
+.app{display:none;flex-direction:column;min-height:100vh;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.driver-info{display:flex;align-items:center;gap:9px;}
+.driver-av{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.driver-nm{font-weight:800;font-size:.9rem;}
+.driver-st{font-size:.7rem;color:var(--muted);}
+.online-toggle{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:6px 14px;font-family:var(--font);font-weight:700;font-size:.76rem;cursor:pointer;color:var(--text);transition:all .2s;}
+.online-toggle.on{background:rgba(63,185,80,.15);border-color:var(--green);color:var(--green);}
+
+/* MAP */
+#dmap{height:42vh;width:100%;}
+
+/* ACTIVE ORDER BANNER */
+.active-banner{background:linear-gradient(135deg,#1b4332,#0d1117);border-top:2px solid var(--accent2);padding:14px 16px;}
+.ab-label{font-size:.62rem;font-weight:700;color:var(--accent2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;}
+.ab-order{font-size:1.4rem;font-weight:800;margin-bottom:2px;}
+.ab-sub{font-size:.8rem;color:var(--muted);margin-bottom:14px;}
+
+/* PROGRESS */
+.progress{display:flex;align-items:center;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;}
+.ps{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+.pc{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:all .3s;}
+.pc.done{background:var(--green);border-color:var(--green);color:#fff;}
+.pc.current{background:var(--accent);border-color:var(--accent);box-shadow:0 0 12px rgba(45,106,79,.5);}
+.pl{font-size:.55rem;font-weight:700;color:var(--muted);margin-top:3px;text-align:center;width:52px;}
+.pl.done{color:var(--green);}
+.pl.current{color:var(--accent2);}
+.pline{height:2px;flex:1;background:var(--border);min-width:14px;transition:background .3s;}
+.pline.done{background:var(--green);}
+
+/* ROUTE CARDS */
+.rcards{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;}
+.rc{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;flex-shrink:0;min-width:110px;}
+.rc-l{font-size:.6rem;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px;}
+.rc-v{font-size:.95rem;font-weight:800;}
+.rc-s{font-size:.68rem;color:var(--muted);margin-top:2px;}
+
+/* ACTION BUTTONS */
+.action-area{padding:0 16px 14px;}
+.big-btn{width:100%;border:none;border-radius:14px;padding:16px;font-family:var(--font);font-weight:800;font-size:.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:all .2s;margin-bottom:8px;}
+.big-btn:active{transform:scale(.98);}
+.go-btn{background:var(--accent);color:#fff;}
+.go-btn:hover{background:#235c40;}
+.nav-btn{background:var(--blue);color:#fff;}
+.call-btn{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.done-btn{background:var(--green);color:#fff;}
+
+/* NO ACTIVE */
+.no-active{padding:24px 16px;text-align:center;color:var(--muted);}
+.na-icon{font-size:2.8rem;margin-bottom:10px;}
+
+/* ORDERS SCREEN */
+.orders-screen{padding:0 0 80px;}
+.sec-title{font-size:.72rem;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;padding:14px 16px 8px;}
+.order-cards{padding:0 16px;display:flex;flex-direction:column;gap:10px;}
+.ocard{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px;transition:border-color .2s;}
+.ocard.new{border-color:var(--accent2);animation:glow .8s ease infinite alternate;}
+@keyframes glow{from{box-shadow:none}to{box-shadow:0 0 14px rgba(82,183,136,.3)}}
+.ocard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.ocard-id{font-weight:800;font-size:.85rem;color:var(--accent2);}
+.ocard-row{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);margin-bottom:3px;}
+.ocard-row strong{color:var(--text);}
+.ocard-btns{display:flex;gap:7px;margin-top:10px;}
+.sm-btn{flex:1;border:none;border-radius:9px;padding:10px;font-family:var(--font);font-weight:700;font-size:.75rem;cursor:pointer;transition:all .2s;}
+.sm-btn:active{transform:scale(.97);}
+.sb-green{background:var(--green);color:#fff;}
+.sb-blue{background:var(--blue);color:#fff;}
+.sb-gray{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:.66rem;font-weight:700;}
+.bg-yellow{background:rgba(210,153,34,.15);color:var(--yellow);}
+.bg-green{background:rgba(63,185,80,.15);color:var(--green);}
+.bg-blue{background:rgba(88,166,255,.15);color:var(--blue);}
+.bg-purple{background:rgba(188,140,255,.15);color:var(--purple);}
+.bg-gray{background:rgba(125,133,144,.15);color:var(--muted);}
+
+/* EARNINGS SCREEN */
+.earn-screen{padding:0 16px 80px;}
+.earn-hero{background:linear-gradient(135deg,#1b4332,#2d6a4f);border-radius:16px;padding:24px;text-align:center;margin:16px 0;}
+.earn-big{font-size:2.4rem;font-weight:800;color:#fff;margin-bottom:4px;}
+.earn-sub{font-size:.82rem;color:#b7e4c7;}
+.earn-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.earn-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.ec-v{font-size:1.2rem;font-weight:800;color:var(--accent2);margin-bottom:3px;}
+.ec-l{font-size:.66rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+.history-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.hi-info{flex:1;}
+.hi-id{font-weight:800;font-size:.82rem;color:var(--accent2);}
+.hi-sub{font-size:.72rem;color:var(--muted);margin-top:1px;}
+.hi-earn{font-weight:800;color:var(--green);}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100;}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 0;cursor:pointer;color:var(--muted);font-size:.6rem;font-weight:700;gap:3px;transition:color .2s;position:relative;}
+.bn-item.active,.bn-item:active{color:var(--accent2);}
+.bn-icon{font-size:1.3rem;}
+.bn-badge{position:absolute;top:7px;right:calc(50% - 18px);background:var(--accent3);color:#fff;border-radius:999px;min-width:16px;height:16px;font-size:.6rem;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 3px;}
+.bn-badge.show{display:flex;}
+
+/* ALERT */
+.new-order-alert{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--accent2);z-index:500;padding:13px 16px;display:none;cursor:pointer;animation:slide-down .3s ease;}
+.new-order-alert.show{display:block;}
+@keyframes slide-down{from{transform:translateX(-50%) translateY(-100%)}to{transform:translateX(-50%) translateY(0)}}
+
+/* TOAST */
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:9px 20px;border-radius:10px;font-weight:700;font-size:.8rem;z-index:9999;display:none;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.3);}
+.toast.show{display:block;}
+
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:var(--border);}
+</style>
+</head>
+<body>
+
+<!-- ALERT -->
+<div class="new-order-alert" id="new-alert" onclick="switchScreen('orders');this.classList.remove('show')">
+  <div style="font-weight:800;font-size:.88rem;color:#fff;margin-bottom:2px">🔔 New order available!</div>
+  <div style="font-size:.74rem;opacity:.88;color:#fff" id="alert-msg">Tap to view</div>
+</div>
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-icon">🚚</div>
+  <div class="login-title">Landa Driver</div>
+  <div class="login-sub">Delivery Partner App</div>
+  <div class="login-card">
+    <div class="hint">✅ Demo login pre-filled<br/>Any email · Password: driver123</div>
+    <div class="fg"><label>Email / Phone</label><input type="text" id="d-email" value="driver@landa.co.tz"/></div>
+    <div class="fg"><label>Password</label><input type="password" id="d-pass" value="driver123"/></div>
+    <button class="btn-login" onclick="driverLogin()">Start Driving →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="driver-app">
+  <div class="topbar">
+    <div class="driver-info">
+      <div class="driver-av">🚚</div>
+      <div>
+        <div class="driver-nm" id="d-name">Driver</div>
+        <div class="driver-st" id="d-status">Online</div>
+      </div>
+    </div>
+    <button class="online-toggle on" id="online-btn" onclick="toggleOnline()">🟢 Online</button>
+  </div>
+
+  <!-- MAP SCREEN -->
+  <div id="screen-map">
+    <div id="dmap"></div>
+    <!-- ACTIVE ORDER -->
+    <div class="active-banner" id="active-banner" style="display:none">
+      <div class="ab-label">Active Delivery</div>
+      <div class="ab-order" id="ab-ref">—</div>
+      <div class="ab-sub" id="ab-sub">—</div>
+      <!-- PROGRESS BAR -->
+      <div class="progress" id="prog-bar">
+        <div class="ps"><div class="pc current" id="pc0">✓</div><div class="pl current" id="pl0">Confirmed</div></div>
+        <div class="pline" id="pl1"></div>
+        <div class="ps"><div class="pc" id="pc1">📦</div><div class="pl" id="pl1l">Preparing</div></div>
+        <div class="pline" id="pl2"></div>
+        <div class="ps"><div class="pc" id="pc2">🚚</div><div class="pl" id="pl2l">Picked Up</div></div>
+        <div class="pline" id="pl3"></div>
+        <div class="ps"><div class="pc" id="pc3">🎉</div><div class="pl" id="pl3l">Delivered</div></div>
+      </div>
+      <!-- ROUTE INFO -->
+      <div class="rcards">
+        <div class="rc"><div class="rc-l">Pick Up</div><div class="rc-v" id="rc-supplier">—</div><div class="rc-s">Supplier</div></div>
+        <div class="rc"><div class="rc-l">Deliver To</div><div class="rc-v" id="rc-buyer">—</div><div class="rc-s" id="rc-addr">—</div></div>
+        <div class="rc"><div class="rc-l">Payment</div><div class="rc-v" id="rc-pay">—</div><div class="rc-s" id="rc-amount">TZS 0</div></div>
+        <div class="rc"><div class="rc-l">Your Fee</div><div class="rc-v" id="rc-fee">TZS 0</div><div class="rc-s">Delivery</div></div>
+      </div>
+      <!-- ACTION BUTTONS -->
+      <div class="action-area">
+        <button class="big-btn go-btn" id="main-btn" onclick="doAction()">
+          <span id="btn-icon">🚚</span><span id="btn-text">I Picked Up the Order</span>
+        </button>
+        <button class="big-btn nav-btn" onclick="openNav()">🗺️ Open Google Maps Navigation</button>
+        <button class="big-btn call-btn" onclick="callBuyer()">📞 Call Buyer</button>
+      </div>
+    </div>
+    <div class="no-active" id="no-active">
+      <div class="na-icon">🚚</div>
+      <div style="font-weight:700;margin-bottom:4px">No active delivery</div>
+      <div style="font-size:.8rem">Accept an order from the Orders tab</div>
+    </div>
+  </div>
+
+  <!-- ORDERS SCREEN -->
+  <div id="screen-orders" style="display:none">
+    <div class="orders-screen">
+      <div class="sec-title">📦 Ready for Pickup</div>
+      <div class="order-cards" id="ready-list"></div>
+      <div class="sec-title">📋 All Available Orders</div>
+      <div class="order-cards" id="all-list"></div>
+    </div>
+  </div>
+
+  <!-- EARNINGS SCREEN -->
+  <div id="screen-earnings" style="display:none">
+    <div class="earn-screen">
+      <div class="earn-hero">
+        <div class="earn-big" id="earn-total">TZS 0</div>
+        <div class="earn-sub">Total earnings today</div>
+      </div>
+      <div class="earn-grid">
+        <div class="earn-card"><div class="ec-v" id="earn-trips">0</div><div class="ec-l">Deliveries Done</div></div>
+        <div class="earn-card"><div class="ec-v">⭐ 4.9</div><div class="ec-l">Your Rating</div></div>
+        <div class="earn-card"><div class="ec-v" id="earn-week">TZS 0</div><div class="ec-l">This Week</div></div>
+        <div class="earn-card"><div class="ec-v">15%</div><div class="ec-l">Per Delivery</div></div>
+      </div>
+      <div class="sec-title">Recent Deliveries</div>
+      <div style="padding:0 16px" id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bnav">
+    <div class="bn-item active" id="bn-map" onclick="switchScreen('map',this)"><span class="bn-icon">🗺️</span>Map</div>
+    <div class="bn-item" id="bn-orders" onclick="switchScreen('orders',this)">
+      <span class="bn-icon">📦</span>Orders
+      <div class="bn-badge" id="orders-badge">0</div>
+    </div>
+    <div class="bn-item" id="bn-earnings" onclick="switchScreen('earnings',this)"><span class="bn-icon">💰</span>Earnings</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB_URL='https://xfmxhetppwiwwfhbvvnl.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmbXhoZXRwcHdpd3dmaGJ2dm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA1NzYsImV4cCI6MjA5NzIwNjU3Nn0.t7_1cmBna9tEp-SQ4BemlZ5rQ2jsap5iBWqWbyxOhno';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+
+let map=null,driverMarker=null,supplierMarker=null,buyerMarker=null,routeLine=null;
+let driverLat=-6.7924,driverLng=39.2083,isOnline=true;
+let activeOrder=null,allOrders=[],deliveredOrders=[];
+let currentDriver={name:'Driver',email:'driver@landa.co.tz',phone:''};
+
+const STAGES=['confirmed','preparing','picked_up','delivered'];
+const NEXT={confirmed:'preparing',preparing:'picked_up',picked_up:'delivered'};
+const STAGE_BTN={
+  confirmed:{icon:'📦',text:'Order is Ready — Head to Supplier',class:'go-btn'},
+  preparing:{icon:'🚚',text:'I Picked Up the Order',class:'go-btn'},
+  picked_up:{icon:'🎉',text:'Order Delivered!',class:'done-btn'},
+};
+
+window.addEventListener('DOMContentLoaded',async()=>{
+  const{data:{session}}=await sb.auth.getSession();
+  if(session){currentDriver.email=session.user.email;showApp();}
+});
+
+async function driverLogin(){
+  const email=document.getElementById('d-email').value;
+  const pass=document.getElementById('d-pass').value;
+  if(pass==='driver123'){currentDriver.email=email;currentDriver.name=email.split('@')[0];showApp();return;}
+  const{error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){showToast('❌ '+error.message);return;}
+  currentDriver.email=email;currentDriver.name=email.split('@')[0];
+  showApp();
+}
+
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('driver-app').style.display='flex';
+  document.getElementById('driver-app').style.flexDirection='column';
+  document.getElementById('d-name').textContent=currentDriver.name||currentDriver.email.split('@')[0];
+  initMap();locateDriver();loadOrders();
+  // Realtime
+  sb.channel('driver-landa')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'},payload=>{
+      const o=payload.new||{};
+      if(['confirmed','preparing'].includes(o.status)){
+        showAlert('#'+(o.order_reference||'')+ ' ready near you!');
+      }
+      loadOrders();
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'},()=>loadOrders())
+    .subscribe();
+  setInterval(loadOrders,30000);
+}
+
+// ── MAP ──
+function initMap(){
+  map=L.map('dmap',{zoomControl:false,attributionControl:false}).setView([driverLat,driverLng],14);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+}
+
+function locateDriver(){
+  if(!navigator.geolocation)return;
+  navigator.geolocation.watchPosition(pos=>{
+    driverLat=pos.coords.latitude;driverLng=pos.coords.longitude;
+    const icon=L.divIcon({html:'<div style="background:#52b788;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 10px rgba(82,183,136,.6)"></div>',className:'',iconAnchor:[8,8]});
+    if(driverMarker)driverMarker.setLatLng([driverLat,driverLng]);
+    else driverMarker=L.marker([driverLat,driverLng],{icon}).addTo(map).bindPopup('🚚 You');
+    if(!activeOrder)map.setView([driverLat,driverLng],15);
+    if(activeOrder)updateRoute();
+  },{enableHighAccuracy:true,maximumAge:5000});
+}
+
+function placeOrderMarkers(order){
+  [supplierMarker,buyerMarker,routeLine].forEach(m=>{if(m&&map)map.removeLayer(m);});
+  const sLat=parseFloat(order.supplier_lat)||driverLat-0.01;
+  const sLng=parseFloat(order.supplier_lng)||driverLng+0.01;
+  const bLat=parseFloat(order.buyer_lat)||driverLat+0.01;
+  const bLng=parseFloat(order.buyer_lng)||driverLng-0.01;
+  supplierMarker=L.marker([sLat,sLng],{icon:L.divIcon({html:'<div style="background:#f77f00;border-radius:8px;padding:3px 8px;font-size:.7rem;font-weight:800;color:#fff;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)">🌾 Supplier</div>',className:'',iconAnchor:[40,10]})}).addTo(map);
+  buyerMarker=L.marker([bLat,bLng],{icon:L.divIcon({html:'<div style="background:#3fb950;border-radius:8px;padding:3px 8px;font-size:.7rem;font-weight:800;color:#fff;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)">🍽️ Buyer</div>',className:'',iconAnchor:[40,10]})}).addTo(map);
+  updateRoute();
+  map.fitBounds([[driverLat,driverLng],[sLat,sLng],[bLat,bLng]],{padding:[30,30]});
+}
+
+function updateRoute(){
+  if(!activeOrder||!map)return;
+  if(routeLine)map.removeLayer(routeLine);
+  const sLat=parseFloat(activeOrder.supplier_lat)||driverLat-0.01;
+  const sLng=parseFloat(activeOrder.supplier_lng)||driverLng+0.01;
+  const bLat=parseFloat(activeOrder.buyer_lat)||driverLat+0.01;
+  const bLng=parseFloat(activeOrder.buyer_lng)||driverLng-0.01;
+  const pts=activeOrder.status==='picked_up'
+    ?[[driverLat,driverLng],[bLat,bLng]]
+    :[[driverLat,driverLng],[sLat,sLng],[bLat,bLng]];
+  routeLine=L.polyline(pts,{color:'#52b788',weight:3,opacity:.8,dashArray:'8,4'}).addTo(map);
+}
+
+// ── LOAD ORDERS ──
+async function loadOrders(){
+  try{
+    const{data}=await sb.from('orders')
+      .select('*')
+      .in('status',['confirmed','preparing','picked_up','delivered'])
+      .order('created_at',{ascending:false})
+      .limit(50);
+    allOrders=data||[];
+  }catch(e){allOrders=[];}
+  renderOrders();
+  updateEarnings();
+  if(activeOrder){
+    const updated=allOrders.find(o=>o.id===activeOrder.id);
+    if(updated&&updated.status!==activeOrder.status){
+      activeOrder.status=updated.status;
+      updateProgressUI(updated.status);
+    }
+  }
+}
+
+function renderOrders(){
+  const ready=allOrders.filter(o=>o.status==='confirmed');
+  const others=allOrders.filter(o=>o.status==='preparing'||o.status==='picked_up');
+  const badge=ready.length;
+  document.getElementById('orders-badge').textContent=badge;
+  document.getElementById('orders-badge').classList.toggle('show',badge>0);
+
+  document.getElementById('ready-list').innerHTML=!ready.length
+    ?'<div style="color:var(--muted);font-size:.78rem;padding:8px 0;font-style:italic">No orders ready for pickup yet</div>'
+    :ready.map(o=>orderCard(o,true)).join('');
+
+  document.getElementById('all-list').innerHTML=!others.length
+    ?'<div style="color:var(--muted);font-size:.78rem;padding:8px 0;font-style:italic">No other active orders</div>'
+    :others.map(o=>orderCard(o,false)).join('');
+}
+
+function orderCard(o,isReady){
+  const isActive=activeOrder&&activeOrder.id===o.id;
+  const badgeMap={confirmed:'bg-yellow',preparing:'bg-blue',picked_up:'bg-purple',delivered:'bg-green'};
+  return `<div class="ocard ${isReady&&!activeOrder?'new':''}">
+    <div class="ocard-top">
+      <div class="ocard-id">#${o.order_reference||o.id?.slice(0,8)||'—'}</div>
+      <span class="badge ${badgeMap[o.status]||'bg-gray'}">${o.status?.replace('_',' ')}</span>
+    </div>
+    <div class="ocard-row">🍽️ <strong>${o.business_name||'—'}</strong></div>
+    <div class="ocard-row">📍 ${o.delivery_address||'—'}</div>
+    <div class="ocard-row">📱 ${o.phone||'—'}</div>
+    <div class="ocard-row">💳 ${o.payment_method||'—'} · TZS ${(o.total_amount||0).toLocaleString()}</div>
+    <div class="ocard-row">💰 Your fee: <strong style="color:var(--green)">TZS ${(o.delivery_fee||3000).toLocaleString()}</strong></div>
+    <div class="ocard-btns">
+      ${isActive?`<button class="sm-btn sb-gray">✓ Active</button>`:
+        o.status!=='delivered'?`<button class="sm-btn sb-green" onclick="acceptOrder('${o.id}')">Accept Order</button>`:''}
+      <button class="sm-btn sb-blue" onclick="navTo(${o.buyer_lat||0},${o.buyer_lng||0})">🗺️ Nav</button>
+      <button class="sm-btn sb-gray" onclick="callNum('${o.phone}')">📞</button>
+    </div>
+  </div>`;
+}
+
+function acceptOrder(id){
+  const order=allOrders.find(o=>o.id===id);
+  if(!order)return;
+  if(activeOrder&&activeOrder.id!==id){showToast('Finish current delivery first');return;}
+  activeOrder=order;
+  setActiveOrderUI(order);
+  switchScreen('map');
+  showToast('✅ Order accepted!');
+}
+
+function setActiveOrderUI(o){
+  document.getElementById('active-banner').style.display='block';
+  document.getElementById('no-active').style.display='none';
+  document.getElementById('ab-ref').textContent='#'+(o.order_reference||o.id?.slice(0,8));
+  document.getElementById('ab-sub').textContent=(o.business_name||'')+(o.delivery_address?' → '+o.delivery_address:'');
+  document.getElementById('rc-buyer').textContent=(o.business_name||'Buyer').split(' ')[0];
+  document.getElementById('rc-addr').textContent=o.delivery_address||'—';
+  document.getElementById('rc-pay').textContent=o.payment_method||'—';
+  document.getElementById('rc-amount').textContent='TZS '+(o.total_amount||0).toLocaleString();
+  document.getElementById('rc-fee').textContent='TZS '+(o.delivery_fee||3000).toLocaleString();
+  document.getElementById('rc-supplier').textContent='Loading…';
+  updateProgressUI(o.status);
+  placeOrderMarkers(o);
+}
+
+function updateProgressUI(status){
+  if(!activeOrder)return;
+  const idx=STAGES.indexOf(status);
+  STAGES.forEach((s,i)=>{
+    const pc=document.getElementById('pc'+i);
+    const pl=document.getElementById('pl'+i+'l')||document.getElementById('pl'+i);
+    if(!pc)return;
+    pc.className='pc';if(pl)pl.className='pl';
+    if(i<idx){pc.classList.add('done');pc.textContent='✓';if(pl)pl.classList.add('done');}
+    else if(i===idx){pc.classList.add('current');if(pl)pl.classList.add('current');}
+    const line=document.getElementById('pl'+(i+1));
+    if(line)line.className='pline'+(i<idx?' done':'');
+  });
+  const btn=STAGE_BTN[status];
+  if(btn){
+    document.getElementById('btn-icon').textContent=btn.icon;
+    document.getElementById('btn-text').textContent=btn.text;
+    const mb=document.getElementById('main-btn');
+    mb.className='big-btn '+btn.class;
+    mb.style.display='flex';
+  }
+  if(status==='delivered')document.getElementById('main-btn').style.display='none';
+}
+
+async function doAction(){
+  if(!activeOrder)return;
+  const next=NEXT[activeOrder.status];
+  if(!next)return;
+  activeOrder.status=next;
+  try{
+    const upd={status:next,updated_at:new Date().toISOString()};
+    if(next==='picked_up'){upd.driver_name=currentDriver.name;upd.driver_phone=currentDriver.phone||'';}
+    await sb.from('orders').update(upd).eq('id',activeOrder.id);
+  }catch(e){console.log('Update error:',e);}
+  updateProgressUI(next);
+  if(next==='picked_up')updateRoute();
+  if(next==='delivered'){
+    showToast('🎉 Delivery complete! Great job!');
+    deliveredOrders.unshift({...activeOrder});
+    updateEarnings();
+    setTimeout(()=>{
+      activeOrder=null;
+      document.getElementById('active-banner').style.display='none';
+      document.getElementById('no-active').style.display='block';
+      [supplierMarker,buyerMarker,routeLine].forEach(m=>{if(m&&map)map.removeLayer(m);});
+    },2000);
+  }else showToast('✅ Status: '+next.replace('_',' '));
+  await loadOrders();
+}
+
+function openNav(){
+  if(!activeOrder)return;
+  const isPickup=['confirmed','preparing'].includes(activeOrder.status);
+  const lat=isPickup?(activeOrder.supplier_lat||driverLat):(activeOrder.buyer_lat||driverLat);
+  const lng=isPickup?(activeOrder.supplier_lng||driverLng):(activeOrder.buyer_lng||driverLng);
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`,'_blank');
+}
+function callBuyer(){activeOrder&&callNum(activeOrder.phone);}
+function callNum(phone){if(!phone||phone==='—')return showToast('No phone number');window.open('tel:'+phone);}
+function navTo(lat,lng){if(!lat||!lng)return showToast('No GPS coordinates');window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`,'_blank');}
+
+function updateEarnings(){
+  const done=[...deliveredOrders,...allOrders.filter(o=>o.status==='delivered')];
+  const total=done.reduce((s,o)=>s+(o.delivery_fee||3000),0);
+  const week=done.length*3000;
+  document.getElementById('earn-total').textContent='TZS '+total.toLocaleString();
+  document.getElementById('earn-trips').textContent=done.length;
+  document.getElementById('earn-week').textContent='TZS '+week.toLocaleString();
+  document.getElementById('history-list').innerHTML=!done.length
+    ?'<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:24px">No deliveries yet</div>'
+    :done.slice(0,10).map(o=>`<div class="history-item">
+      <div class="hi-info">
+        <div class="hi-id">#${o.order_reference||o.id?.slice(0,8)||'—'}</div>
+        <div class="hi-sub">${o.business_name||'—'} · ${o.delivery_address||'—'}</div>
+      </div>
+      <div class="hi-earn">+ TZS ${(o.delivery_fee||3000).toLocaleString()}</div>
+    </div>`).join('');
+}
+
+function toggleOnline(){
+  isOnline=!isOnline;
+  const btn=document.getElementById('online-btn');
+  document.getElementById('d-status').textContent=isOnline?'Online':'Offline';
+  btn.textContent=isOnline?'🟢 Online':'⚫ Offline';
+  btn.className='online-toggle'+(isOnline?' on':'');
+  showToast(isOnline?'You are now online':'You are now offline');
+}
+
+function switchScreen(name,el){
+  ['map','orders','earnings'].forEach(s=>{document.getElementById('screen-'+s).style.display='none';});
+  document.querySelectorAll('.bn-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('screen-'+name).style.display='block';
+  if(el)el.classList.add('active');
+  else document.getElementById('bn-'+name)?.classList.add('active');
+  if(name==='orders')loadOrders();
+  if(name==='earnings')updateEarnings();
+  if(name==='map'&&map)setTimeout(()=>map.invalidateSize(),100);
+}
+
+function showAlert(msg){
+  document.getElementById('alert-msg').textContent=msg;
+  document.getElementById('new-alert').classList.add('show');
+  setTimeout(()=>document.getElementById('new-alert').classList.remove('show'),7000);
+}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+</script>
+</body>
+</html>
