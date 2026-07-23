@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Landa — Supplier Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#f8f6f0;--surface:#fff;--surface2:#f3f0e8;--border:#e5e0d0;
+  --accent:#2d6a4f;--accent2:#52b788;--accent3:#f77f00;
+  --text:#1a1a1a;--muted:#6b7280;--red:#dc2626;--green:#16a34a;
+  --blue:#2563eb;--yellow:#d97706;--radius:14px;--font:'Plus Jakarta Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+
+/* LOGIN */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#1b4332,#2d6a4f);}
+.login-card{background:#fff;border-radius:20px;padding:36px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px;}
+.login-logo-icon{width:42px;height:42px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;}
+.login-logo-text{font-family:'Instrument Serif',serif;font-size:1.5rem;color:var(--accent);font-style:italic;}
+.login-card h2{font-size:1.3rem;margin-bottom:4px;}
+.login-card p{color:var(--muted);font-size:.84rem;margin-bottom:22px;}
+.auth-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:12px;padding:4px;margin-bottom:20px;}
+.auth-tab{flex:1;padding:9px;text-align:center;border-radius:9px;cursor:pointer;font-weight:700;font-size:.86rem;color:var(--muted);transition:all .2s;}
+.auth-tab.active{background:var(--accent);color:#fff;}
+.fg{margin-bottom:14px;}
+.fg label{display:block;font-size:.76rem;font-weight:700;color:var(--muted);margin-bottom:4px;}
+.fg input,.fg select,.fg textarea{width:100%;background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:var(--font);font-size:.9rem;outline:none;transition:border-color .2s;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent);}
+.fg textarea{resize:vertical;min-height:70px;}
+.btn-auth{width:100%;background:var(--accent);border:none;border-radius:12px;padding:14px;color:#fff;font-family:var(--font);font-weight:800;font-size:.95rem;cursor:pointer;}
+.btn-auth:hover{background:#235c40;}
+.hint-box{background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.76rem;color:#065f46;line-height:1.5;}
+
+/* APP LAYOUT */
+.app{display:none;min-height:100vh;flex-direction:column;}
+.topbar{background:var(--surface);border-bottom:2px solid var(--border);padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+.topbar-logo{display:flex;align-items:center;gap:9px;}
+.tl-icon{width:34px;height:34px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;}
+.tl-text{font-family:'Instrument Serif',serif;font-size:1.3rem;color:var(--accent);font-style:italic;}
+.tl-badge{font-size:.6rem;font-weight:700;color:var(--muted);letter-spacing:.08em;display:block;margin-top:-3px;}
+.topbar-center{display:flex;gap:4px;background:var(--surface2);border-radius:12px;padding:4px;}
+.tab-btn{padding:7px 16px;border-radius:9px;font-weight:700;font-size:.82rem;cursor:pointer;color:var(--muted);border:none;background:none;font-family:var(--font);transition:all .2s;position:relative;}
+.tab-btn.active{background:var(--accent);color:#fff;}
+.tab-badge{position:absolute;top:-4px;right:-4px;background:var(--accent3);color:#fff;border-radius:999px;min-width:16px;height:16px;font-size:.6rem;font-weight:800;display:none;align-items:center;justify-content:center;}
+.tab-badge.show{display:flex;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.shop-name{font-weight:800;font-size:.88rem;}
+.live-badge{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--green);font-weight:700;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;font-family:var(--font);font-weight:700;font-size:.82rem;cursor:pointer;border:none;transition:all .2s;}
+.btn-accent{background:var(--accent);color:#fff;}
+.btn-accent:hover{background:#235c40;}
+.btn-ghost{background:var(--surface2);color:var(--text);border:2px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-red{background:#fee2e2;color:var(--red);border:1px solid #fca5a5;}
+.btn-red:hover{background:#fecaca;}
+
+/* CONTENT */
+.page{display:none;padding:24px;max-width:1200px;margin:0 auto;width:100%;}
+.page.active{display:block;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.stat{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--stat-color,var(--accent2));border-radius:var(--radius) var(--radius) 0 0;}
+.stat-label{font-size:.7rem;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:7px;}
+.stat-val{font-size:1.8rem;font-weight:800;}
+.stat-sub{font-size:.74rem;color:var(--muted);margin-top:3px;}
+
+/* CARDS */
+.card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;}
+.card-header{padding:15px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.card-title{font-weight:800;font-size:.95rem;}
+
+/* ORDERS KANBAN */
+.kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;}
+.kcol{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.kcol-header{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.kcol-title{font-weight:800;font-size:.8rem;}
+.kcol-count{background:var(--surface2);border-radius:999px;padding:2px 9px;font-size:.7rem;font-weight:700;color:var(--muted);}
+.kcol-body{padding:10px;display:flex;flex-direction:column;gap:8px;min-height:100px;max-height:340px;overflow-y:auto;}
+.ocard{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;}
+.ocard-id{font-weight:800;font-size:.78rem;color:var(--accent);margin-bottom:5px;}
+.ocard-row{font-size:.72rem;color:var(--muted);margin-bottom:2px;display:flex;align-items:center;gap:4px;}
+.ocard-row strong{color:var(--text);}
+.ocard-amount{font-weight:800;font-size:.9rem;color:var(--accent);margin:6px 0;}
+.ocard-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;}
+.abtn{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-family:var(--font);font-size:.68rem;font-weight:700;cursor:pointer;transition:all .2s;color:var(--muted);}
+.abtn.g{border-color:var(--accent2);color:var(--green);}
+.abtn.g:hover{background:var(--green);color:#fff;}
+.abtn.r:hover{border-color:var(--red);color:var(--red);}
+.empty-col{text-align:center;padding:20px 10px;color:var(--muted);font-size:.76rem;}
+
+/* ORDERS TABLE */
+table{width:100%;border-collapse:collapse;}
+th{padding:10px 14px;text-align:left;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);}
+td{padding:11px 14px;font-size:.82rem;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--surface2);}
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;font-size:.68rem;font-weight:700;}
+.badge-green{background:#d1fae5;color:#065f46;}
+.badge-blue{background:#dbeafe;color:#1d4ed8;}
+.badge-yellow{background:#fef3c7;color:#92400e;}
+.badge-red{background:#fee2e2;color:var(--red);}
+.badge-purple{background:#ede9fe;color:#5b21b6;}
+.badge-gray{background:#f3f4f6;color:var(--muted);}
+.status-sel{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-family:var(--font);font-size:.76rem;outline:none;cursor:pointer;}
+
+/* PRODUCT GRID */
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;padding:16px;}
+.prod-card{background:var(--surface2);border:2px solid var(--border);border-radius:12px;overflow:hidden;transition:all .2s;}
+.prod-card:hover{border-color:var(--accent2);}
+.prod-img{height:140px;background:linear-gradient(135deg,#d8f3dc,#b7e4c7);display:flex;align-items:center;justify-content:center;font-size:3.5rem;position:relative;}
+.prod-img img{width:100%;height:100%;object-fit:cover;}
+.prod-body{padding:13px;}
+.prod-name{font-weight:800;font-size:.92rem;margin-bottom:3px;}
+.prod-cat{font-size:.72rem;color:var(--muted);margin-bottom:8px;}
+.prod-units{margin-bottom:9px;}
+.unit-chip{display:flex;justify-content:space-between;font-size:.76rem;padding:4px 0;border-bottom:1px solid var(--border);}
+.unit-chip:last-child{border:none;}
+.unit-chip span:last-child{font-weight:700;color:var(--accent);}
+.prod-footer{display:flex;gap:6px;}
+
+/* ADD PRODUCT FORM */
+.unit-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px;}
+.unit-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;}
+.unit-row input{background:var(--surface2);border:2px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-family:var(--font);font-size:.84rem;outline:none;}
+.unit-row input:focus{border-color:var(--accent);}
+.unit-del{background:#fee2e2;border:none;border-radius:6px;color:var(--red);width:30px;height:30px;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;}
+
+/* PROFILE */
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.profile-map{background:var(--surface2);border:2px solid var(--border);border-radius:12px;height:200px;display:flex;align-items:center;justify-content:center;font-size:3rem;flex-direction:column;gap:8px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:18px;padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15);}
+.modal h2{font-size:1.1rem;font-weight:800;margin-bottom:18px;}
+.mfooter{display:flex;gap:8px;margin-top:16px;justify-content:flex-end;}
+.close-btn{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;float:right;}
+
+/* EARNINGS */
+.earnings-big{text-align:center;padding:28px;background:linear-gradient(135deg,#1b4332,#2d6a4f);border-radius:var(--radius);color:#fff;margin-bottom:20px;}
+.earn-num{font-size:2.8rem;font-weight:800;margin-bottom:4px;}
+.earn-sub{font-size:.86rem;opacity:.8;}
+.earn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+.earn-card{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
+.earn-val{font-size:1.4rem;font-weight:800;color:var(--accent);margin-bottom:3px;}
+.earn-lbl{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--accent);color:#fff;padding:10px 20px;border-radius:10px;font-weight:700;font-size:.84rem;z-index:9999;display:none;box-shadow:0 4px 14px rgba(0,0,0,.15);}
+.toast.show{display:block;}
+.toast.err{background:var(--red);}
+
+/* NEW ORDER ALERT */
+.new-alert{position:fixed;top:0;left:0;right:0;background:var(--green);color:#fff;padding:12px 20px;z-index:999;display:none;align-items:center;justify-content:space-between;}
+.new-alert.show{display:flex;}
+
+@media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr);}.kanban{grid-template-columns:repeat(2,1fr);}.profile-grid{grid-template-columns:1fr;}.form-row{grid-template-columns:1fr;}}
+@media(max-width:600px){.topbar-center{display:none;}.stats{grid-template-columns:repeat(2,1fr);}}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- NEW ORDER ALERT -->
+<div class="new-alert" id="new-alert">
+  <div style="font-weight:800">🔔 New order received! <span id="alert-detail"></span></div>
+  <button onclick="document.getElementById('new-alert').classList.remove('show')" style="background:rgba(255,255,255,.3);border:none;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-weight:700">Dismiss</button>
+</div>
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">🌿</div>
+      <div>
+        <div class="login-logo-text">Landa</div>
+        <span style="font-size:.62rem;color:var(--muted);font-weight:700;letter-spacing:.08em">SUPPLIER PORTAL</span>
+      </div>
+    </div>
+    <h2>Supplier Login</h2>
+    <p>Sell your farm produce to restaurants and businesses across Tanzania</p>
+    <div class="hint-box">✅ Demo credentials pre-filled<br/>Any email · Password: supplier123</div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Sign In</div>
+      <div class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Register</div>
+    </div>
+    <!-- SIGN IN -->
+    <div id="form-login">
+      <div class="fg"><label>Email</label><input type="email" id="s-email" value="supplier@landa.co.tz"/></div>
+      <div class="fg"><label>Password</label><input type="password" id="s-pass" value="supplier123"/></div>
+      <button class="btn-auth" onclick="doLogin()">Sign In →</button>
+    </div>
+    <!-- REGISTER -->
+    <div id="form-signup" style="display:none">
+      <div class="fg"><label>Full Name</label><input type="text" id="r-name" placeholder="Your full name"/></div>
+      <div class="fg"><label>Business Name</label><input type="text" id="r-business" placeholder="e.g. Kilimo Bora Farms"/></div>
+      <div class="fg"><label>Email</label><input type="email" id="r-email" placeholder="you@farm.com"/></div>
+      <div class="fg"><label>Phone / WhatsApp</label><input type="tel" id="r-phone" placeholder="+255 7XX XXX XXX"/></div>
+      <div class="fg"><label>Region</label>
+        <select id="r-region">
+          <option>Dar es Salaam</option><option>Arusha</option><option>Mwanza</option>
+          <option>Dodoma</option><option>Morogoro</option><option>Iringa</option><option>Other</option>
+        </select>
+      </div>
+      <div class="fg"><label>Password</label><input type="password" id="r-pass" placeholder="Min 6 characters"/></div>
+      <button class="btn-auth" onclick="doSignup()">Create Account →</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="tl-icon">🌿</div>
+      <div>
+        <div class="tl-text">Landa</div>
+        <span class="tl-badge">SUPPLIER PORTAL</span>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <button class="tab-btn active" onclick="showPage('dashboard',this)">📊 Dashboard</button>
+      <button class="tab-btn" onclick="showPage('orders',this)" id="tab-orders">
+        📦 Orders
+        <span class="tab-badge" id="orders-badge">0</span>
+      </button>
+      <button class="tab-btn" onclick="showPage('products',this)">🥬 Products</button>
+      <button class="tab-btn" onclick="showPage('earnings',this)">💰 Earnings</button>
+      <button class="tab-btn" onclick="showPage('profile',this)">⚙️ Profile</button>
+    </div>
+    <div class="topbar-right">
+      <div class="live-badge"><div class="live-dot"></div>Live</div>
+      <div class="shop-name" id="shop-name">My Shop</div>
+      <button class="btn btn-ghost" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats">
+      <div class="stat" style="--stat-color:var(--accent3)">
+        <div class="stat-label">New Orders</div>
+        <div class="stat-val" id="st-new">0</div>
+        <div class="stat-sub">Awaiting action</div>
+      </div>
+      <div class="stat" style="--stat-color:var(--blue)">
+        <div class="stat-label">Today's Orders</div>
+        <div class="stat-val" id="st-today">0</div>
+        <div class="stat-sub">All orders today</div>
+      </div>
+      <div class="stat" style="--stat-color:var(--green)">
+        <div class="stat-label">Revenue Today</div>
+        <div class="stat-val" id="st-revenue">TZS 0</div>
+        <div class="stat-sub">After Landa commission</div>
+      </div>
+      <div class="stat" style="--stat-color:var(--accent)">
+        <div class="stat-label">Total Products</div>
+        <div class="stat-val" id="st-prods">0</div>
+        <div class="stat-sub">Active listings</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📦 Recent Orders</div>
+        <button class="btn btn-ghost" onclick="showPage('orders',document.querySelectorAll('.tab-btn')[1])">View all →</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>Order</th><th>Buyer</th><th>Business</th><th>Items</th><th>Total</th><th>Your Payout</th><th>Status</th><th>Update</th></tr></thead>
+        <tbody id="recent-orders"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ORDERS -->
+  <div class="page" id="page-orders">
+    <!-- KANBAN BOARD -->
+    <div style="font-weight:800;font-size:1rem;margin-bottom:14px">Live Order Board</div>
+    <div class="kanban">
+      <div class="kcol">
+        <div class="kcol-header"><div class="kcol-title" style="color:var(--yellow)">📥 New <span class="kcol-count" id="kc-pending">0</span></div></div>
+        <div class="kcol-body" id="kb-pending"></div>
+      </div>
+      <div class="kcol">
+        <div class="kcol-header"><div class="kcol-title" style="color:var(--blue)">✅ Confirmed <span class="kcol-count" id="kc-confirmed">0</span></div></div>
+        <div class="kcol-body" id="kb-confirmed"></div>
+      </div>
+      <div class="kcol">
+        <div class="kcol-header"><div class="kcol-title" style="color:var(--accent)">📦 Preparing <span class="kcol-count" id="kc-preparing">0</span></div></div>
+        <div class="kcol-body" id="kb-preparing"></div>
+      </div>
+      <div class="kcol">
+        <div class="kcol-header"><div class="kcol-title" style="color:var(--muted)">🚚 Picked Up <span class="kcol-count" id="kc-picked">0</span></div></div>
+        <div class="kcol-body" id="kb-picked"></div>
+      </div>
+      <div class="kcol">
+        <div class="kcol-header"><div class="kcol-title" style="color:var(--green)">🎉 Done <span class="kcol-count" id="kc-delivered">0</span></div></div>
+        <div class="kcol-body" id="kb-delivered"></div>
+      </div>
+    </div>
+    <!-- ALL ORDERS TABLE -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">All Orders — Full History</div>
+        <input class="btn btn-ghost" placeholder="Search…" oninput="searchOrders(this.value)" style="padding:7px 12px;font-size:.8rem;"/>
+      </div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>Order</th><th>Buyer</th><th>Business</th><th>Phone</th><th>Items</th><th>Total</th><th>Payout</th><th>Payment</th><th>Status</th><th>Update</th><th>Date</th></tr></thead>
+        <tbody id="all-orders"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCTS -->
+  <div class="page" id="page-products">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-weight:800;font-size:1rem">My Products</div>
+      <button class="btn btn-accent" onclick="openModal('add-prod-modal')">+ Add Product</button>
+    </div>
+    <div id="prod-grid-wrap">
+      <div style="text-align:center;padding:40px;color:var(--muted)">
+        <div style="font-size:2.5rem;margin-bottom:10px">📦</div>
+        <div style="font-weight:700;margin-bottom:6px">No products yet</div>
+        <div style="font-size:.82rem;margin-bottom:16px">Add your first product to start receiving orders</div>
+        <button class="btn btn-accent" onclick="openModal('add-prod-modal')">+ Add First Product</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EARNINGS -->
+  <div class="page" id="page-earnings">
+    <div class="earnings-big">
+      <div class="earn-num" id="earn-total">TZS 0</div>
+      <div class="earn-sub">Total Earnings (after 10% Landa commission)</div>
+    </div>
+    <div class="earn-grid">
+      <div class="earn-card"><div class="earn-val" id="earn-today">TZS 0</div><div class="earn-lbl">Today</div></div>
+      <div class="earn-card"><div class="earn-val" id="earn-week">TZS 0</div><div class="earn-lbl">This Week</div></div>
+      <div class="earn-card"><div class="earn-val" id="earn-pending">TZS 0</div><div class="earn-lbl">Pending Payout</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Payment History</div>
+        <button class="btn btn-ghost" onclick="exportEarnings()">📥 Export CSV</button>
+      </div>
+      <table><thead><tr><th>Order</th><th>Amount</th><th>Commission (10%)</th><th>Your Payout</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody id="earnings-tbl"></tbody></table>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="page" id="page-profile">
+    <div class="profile-grid">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⚙️ Shop Profile</div>
+            <button class="btn btn-accent" onclick="saveProfile()">Save Changes</button>
+          </div>
+          <div style="padding:18px">
+            <div class="form-row">
+              <div class="fg"><label>Business Name</label><input type="text" id="p-name" placeholder="Your farm/business name"/></div>
+              <div class="fg"><label>Emoji / Icon</label><input type="text" id="p-emoji" placeholder="🌿" maxlength="2"/></div>
+            </div>
+            <div class="fg"><label>Description</label><textarea id="p-desc" placeholder="Tell buyers about your farm…"></textarea></div>
+            <div class="form-row">
+              <div class="fg"><label>Phone</label><input type="tel" id="p-phone" placeholder="+255 7XX XXX XXX"/></div>
+              <div class="fg"><label>WhatsApp</label><input type="tel" id="p-wa" placeholder="+255 7XX XXX XXX"/></div>
+            </div>
+            <div class="form-row">
+              <div class="fg"><label>Location</label><input type="text" id="p-location" placeholder="e.g. Kariakoo Market"/></div>
+              <div class="fg"><label>Region</label>
+                <select id="p-region">
+                  <option>Dar es Salaam</option><option>Arusha</option><option>Mwanza</option>
+                  <option>Dodoma</option><option>Morogoro</option><option>Iringa</option><option>Other</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="fg"><label>Latitude (GPS)</label><input type="number" id="p-lat" placeholder="-6.7924" step="0.0001"/></div>
+              <div class="fg"><label>Longitude (GPS)</label><input type="number" id="p-lng" placeholder="39.2083" step="0.0001"/></div>
+            </div>
+            <button class="btn btn-ghost" onclick="detectLocation()" style="margin-top:4px">📍 Detect My Location</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📊 My Stats</div></div>
+          <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;font-size:.9rem"><span style="color:var(--muted)">Total Orders</span><strong id="ps-orders">0</strong></div>
+            <div style="display:flex;justify-content:space-between;font-size:.9rem"><span style="color:var(--muted)">Total Revenue</span><strong id="ps-rev">TZS 0</strong></div>
+            <div style="display:flex;justify-content:space-between;font-size:.9rem"><span style="color:var(--muted)">Products Listed</span><strong id="ps-prods">0</strong></div>
+            <div style="display:flex;justify-content:space-between;font-size:.9rem"><span style="color:var(--muted)">Rating</span><strong id="ps-rating">⭐ New</strong></div>
+            <div style="display:flex;justify-content:space-between;font-size:.9rem"><span style="color:var(--muted)">Verified Status</span><strong id="ps-verified">⏳ Pending</strong></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📋 How Payments Work</div></div>
+          <div style="padding:16px;font-size:.82rem;line-height:1.8;color:var(--muted)">
+            <div>🛒 <strong style="color:var(--text)">Buyer places order</strong> and pays total</div>
+            <div>🏦 <strong style="color:var(--text)">Landa holds payment</strong> securely</div>
+            <div>✅ <strong style="color:var(--text)">After delivery confirmed</strong>, Landa pays you</div>
+            <div>💰 <strong style="color:var(--text)">You receive:</strong> order total minus 10% commission</div>
+            <div style="margin-top:10px;padding:10px;background:var(--surface2);border-radius:8px;color:var(--text)">
+              Example: Order TZS 100,000<br/>
+              Landa keeps: TZS 10,000 (10%)<br/>
+              <strong>You get: TZS 90,000</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end app -->
+
+<!-- ADD PRODUCT MODAL -->
+<div class="modal-overlay" id="add-prod-modal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal('add-prod-modal')">×</button>
+    <h2>🥬 Add New Product</h2>
+    <div class="form-row">
+      <div class="fg"><label>Product Name *</label><input type="text" id="np-name" placeholder="e.g. Viazi (Potatoes)"/></div>
+      <div class="fg"><label>Emoji</label><input type="text" id="np-emoji" placeholder="🥔" maxlength="2"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Category</label>
+        <select id="np-cat">
+          <option>Vegetables</option><option>Fruits</option><option>Grains</option>
+          <option>Oils</option><option>Spices</option><option>Dairy</option><option>Other</option>
+        </select>
+      </div>
+      <div class="fg"><label>Stock Quantity</label><input type="number" id="np-stock" placeholder="e.g. 100"/></div>
+    </div>
+    <div class="fg"><label>Description</label><textarea id="np-desc" placeholder="Fresh product from your farm…"></textarea></div>
+    <div class="fg"><label>Image URL (optional)</label><input type="text" id="np-img" placeholder="https://…"/></div>
+    <!-- UNITS -->
+    <div class="fg">
+      <label>Units & Your Prices (buyers see price + 10% automatically)</label>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px;font-size:.76rem;color:var(--muted);margin-bottom:10px">
+        💡 Enter YOUR price. Buyers will see your price + 10% Landa fee automatically.
+        <br/>Example: You enter TZS 8,000 → Buyers see TZS 8,800
+      </div>
+      <div class="unit-list" id="np-units">
+        <div class="unit-row">
+          <input type="text" placeholder="Unit (e.g. Debe)"/>
+          <input type="number" placeholder="Your price (TZS)"/>
+          <button class="unit-del" onclick="this.parentNode.remove()">×</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost" onclick="addUnit()" style="font-size:.78rem">+ Add Unit</button>
+    </div>
+    <div class="mfooter">
+      <button class="btn btn-ghost" onclick="closeModal('add-prod-modal')">Cancel</button>
+      <button class="btn btn-accent" onclick="saveProduct()">List Product →</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB_URL='https://xfmxhetppwiwwfhbvvnl.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmbXhoZXRwcHdpd3dmaGJ2dm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA1NzYsImV4cCI6MjA5NzIwNjU3Nn0.t7_1cmBna9tEp-SQ4BemlZ5rQ2jsap5iBWqWbyxOhno';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+
+let currentUser=null,myProfile=null,myOrders=[],myProducts=[];
+const NEXT={pending:'confirmed',confirmed:'preparing',preparing:'picked_up',picked_up:'delivered'};
+const STATUS_BADGE={pending:'badge-yellow',confirmed:'badge-blue',preparing:'badge-purple',picked_up:'badge-gray',delivered:'badge-green',cancelled:'badge-red'};
+
+// ── INIT ──
+window.addEventListener('DOMContentLoaded',async()=>{
+  const{data:{session}}=await sb.auth.getSession();
+  if(session){currentUser=session.user;showApp();}
+});
+
+// ── AUTH ──
+async function doLogin(){
+  const email=document.getElementById('s-email').value;
+  const pass=document.getElementById('s-pass').value;
+  if(pass==='supplier123'){
+    // Demo bypass
+    currentUser={id:'demo-supplier',email};
+    showApp();return;
+  }
+  const{error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){showToast('❌ '+error.message,true);return;}
+  currentUser=(await sb.auth.getSession()).data.session?.user;
+  showApp();
+}
+
+async function doSignup(){
+  const name=document.getElementById('r-name').value.trim();
+  const business=document.getElementById('r-business').value.trim();
+  const email=document.getElementById('r-email').value.trim();
+  const phone=document.getElementById('r-phone').value.trim();
+  const pass=document.getElementById('r-pass').value;
+  const region=document.getElementById('r-region').value;
+  if(!name||!email||!pass){showToast('❌ Fill all required fields',true);return;}
+  const{error}=await sb.auth.signUp({email,password:pass,options:{data:{full_name:name,business_name:business,phone,role:'supplier'}}});
+  if(error){showToast('❌ '+error.message,true);return;}
+  // Create supplier profile
+  try{
+    await sb.from('suppliers').insert({business_name:business||name,phone,region,is_active:true,is_verified:false,total_orders:0,rating:0});
+  }catch(e){}
+  showToast('🎉 Account created! Please check your email to verify.');
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  currentUser=null;
+}
+
+function switchTab(tab){
+  document.getElementById('tab-login').classList.toggle('active',tab==='login');
+  document.getElementById('tab-signup').classList.toggle('active',tab==='signup');
+  document.getElementById('form-login').style.display=tab==='login'?'block':'none';
+  document.getElementById('form-signup').style.display=tab==='signup'?'block':'none';
+}
+
+// ── SHOW APP ──
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('app').style.flexDirection='column';
+  loadMyProfile();
+  loadOrders();
+  loadProducts();
+  // Realtime subscription
+  sb.channel('supplier-live')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'orders'},payload=>{
+      const o=payload.new||{};
+      showAlert('Order #'+(o.order_reference||o.id?.slice(0,8))+' — TZS '+(o.total_amount||0).toLocaleString());
+      loadOrders();
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'},()=>loadOrders())
+    .subscribe();
+  // Refresh every 30s
+  setInterval(loadOrders,30000);
+}
+
+// ── LOAD PROFILE ──
+async function loadMyProfile(){
+  if(currentUser?.id==='demo-supplier'){
+    myProfile={business_name:'Demo Farm',region:'Dar es Salaam',rating:4.8,total_orders:0,is_verified:false};
+    document.getElementById('shop-name').textContent='Demo Farm';
+    updateProfileUI();return;
+  }
+  try{
+    const{data}=await sb.from('suppliers').select('*').eq('user_id',currentUser.id).single();
+    if(data){
+      myProfile=data;
+      document.getElementById('shop-name').textContent=data.business_name||currentUser.email.split('@')[0];
+      updateProfileUI();
+    }
+  }catch(e){}
+}
+
+function updateProfileUI(){
+  if(!myProfile)return;
+  document.getElementById('p-name').value=myProfile.business_name||'';
+  document.getElementById('p-emoji').value=myProfile.emoji||'🌾';
+  document.getElementById('p-desc').value=myProfile.description||'';
+  document.getElementById('p-phone').value=myProfile.phone||'';
+  document.getElementById('p-wa').value=myProfile.whatsapp||'';
+  document.getElementById('p-location').value=myProfile.location||'';
+  document.getElementById('p-lat').value=myProfile.latitude||'';
+  document.getElementById('p-lng').value=myProfile.longitude||'';
+  document.getElementById('ps-orders').textContent=myProfile.total_orders||0;
+  document.getElementById('ps-rating').textContent=myProfile.rating?'⭐ '+myProfile.rating:'⭐ New';
+  document.getElementById('ps-verified').textContent=myProfile.is_verified?'✅ Verified':'⏳ Pending verification';
+}
+
+// ── LOAD ORDERS ──
+async function loadOrders(){
+  try{
+    const{data}=await sb.from('orders').select('*').order('created_at',{ascending:false}).limit(100);
+    myOrders=data||[];
+  }catch(e){myOrders=[];}
+  renderAll();
+}
+
+function renderAll(){
+  const today=new Date().toISOString().split('T')[0];
+  const todayOrders=myOrders.filter(o=>o.created_at?.startsWith(today));
+  const newOrders=myOrders.filter(o=>o.status==='pending');
+  const delivered=myOrders.filter(o=>o.status==='delivered');
+  const revenue=delivered.reduce((s,o)=>s+(o.total_amount||0)*0.9,0);
+
+  // Stats
+  document.getElementById('st-new').textContent=newOrders.length;
+  document.getElementById('st-today').textContent=todayOrders.length;
+  document.getElementById('st-revenue').textContent='TZS '+Math.round(revenue).toLocaleString();
+  document.getElementById('st-prods').textContent=myProducts.length;
+
+  // Badge
+  if(newOrders.length>0){
+    document.getElementById('orders-badge').textContent=newOrders.length;
+    document.getElementById('orders-badge').classList.add('show');
+  }else{
+    document.getElementById('orders-badge').classList.remove('show');
+  }
+
+  // Profile stats
+  document.getElementById('ps-orders').textContent=myOrders.length;
+  document.getElementById('ps-rev').textContent='TZS '+Math.round(revenue).toLocaleString();
+  document.getElementById('ps-prods').textContent=myProducts.length;
+
+  renderRecentOrders();
+  renderKanban();
+  renderAllOrders();
+  renderEarnings();
+}
+
+function orderCard(o){
+  const next=NEXT[o.status];
+  return `<div class="ocard">
+    <div class="ocard-id">#${o.order_reference||o.id?.slice(0,8)||'—'}</div>
+    <div class="ocard-row">👤 <strong>${o.business_name||'—'}</strong></div>
+    <div class="ocard-row">📱 ${o.phone||'—'}</div>
+    <div class="ocard-row">📍 ${o.delivery_address||'—'}</div>
+    <div class="ocard-amount">TZS ${(o.total_amount||0).toLocaleString()}</div>
+    <div class="ocard-row">Your payout: <strong>TZS ${Math.round((o.total_amount||0)*0.9).toLocaleString()}</strong></div>
+    <div class="ocard-row">💳 ${o.payment_method||'—'}</div>
+    <div class="ocard-actions">
+      ${next?`<button class="abtn g" onclick="updateStatus('${o.id}','${next}')">→ ${next.replace('_',' ')}</button>`:''}
+      <button class="abtn" onclick="callBuyer('${o.phone}')">📞</button>
+      ${o.status==='pending'?`<button class="abtn r" onclick="updateStatus('${o.id}','cancelled')">✗ Cancel</button>`:''}
+    </div>
+  </div>`;
+}
+
+function renderKanban(){
+  const cols={pending:'pending',confirmed:'confirmed',preparing:'preparing',picked_up:'picked',delivered:'delivered'};
+  Object.entries(cols).forEach(([status,key])=>{
+    const orders=myOrders.filter(o=>o.status===status);
+    document.getElementById('kc-'+key).textContent=orders.length;
+    document.getElementById('kb-'+key).innerHTML=orders.length
+      ?orders.map(o=>orderCard(o)).join('')
+      :`<div class="empty-col">No orders</div>`;
+  });
+}
+
+function renderRecentOrders(){
+  document.getElementById('recent-orders').innerHTML=!myOrders.length
+    ?'<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">No orders yet — add products to start receiving orders</td></tr>'
+    :myOrders.slice(0,6).map(o=>orderRow(o)).join('');
+}
+
+function renderAllOrders(){
+  document.getElementById('all-orders').innerHTML=!myOrders.length
+    ?'<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--muted)">No orders yet</td></tr>'
+    :myOrders.map(o=>orderRow(o,true)).join('');
+}
+
+function orderRow(o,full=false){
+  return `<tr>
+    <td><strong style="color:var(--accent)">${o.order_reference||o.id?.slice(0,8)||'—'}</strong></td>
+    <td>${o.buyer_name||'—'}</td>
+    <td>${o.business_name||'—'}</td>
+    ${full?`<td>${o.phone||'—'}</td>`:''}
+    <td style="font-size:.74rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.notes||'—'}</td>
+    <td><strong>TZS ${(o.total_amount||0).toLocaleString()}</strong></td>
+    <td style="color:var(--green)">TZS ${Math.round((o.total_amount||0)*0.9).toLocaleString()}</td>
+    ${full?`<td>${o.payment_method||'—'}</td>`:''}
+    <td><span class="badge ${STATUS_BADGE[o.status]||'badge-gray'}">${o.status||'pending'}</span></td>
+    <td><select class="status-sel" onchange="updateStatus('${o.id}',this.value)">
+      ${['pending','confirmed','preparing','picked_up','delivered','cancelled'].map(s=>`<option ${s===o.status?'selected':''}>${s.replace('_',' ')}</option>`).join('')}
+    </select></td>
+    ${full?`<td style="color:var(--muted);font-size:.74rem">${(o.created_at||'').replace('T',' ').slice(0,16)}</td>`:''} 
+  </tr>`;
+}
+
+async function updateStatus(id,status){
+  status=status.replace(' ','_');
+  try{
+    await sb.from('orders').update({status,updated_at:new Date().toISOString()}).eq('id',id);
+    showToast('✅ Order → '+status.replace('_',' '));
+    await loadOrders();
+  }catch(e){showToast('❌ '+e.message,true);}
+}
+
+function callBuyer(phone){if(!phone||phone==='—')return showToast('No phone number');window.open('tel:'+phone);}
+function searchOrders(q){
+  document.getElementById('all-orders')?.querySelectorAll('tr').forEach(r=>{r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});
+}
+
+// ── PRODUCTS ──
+async function loadProducts(){
+  try{
+    const{data}=await sb.from('products').select('*, product_units(*)').eq('available',true).order('created_at',{ascending:false});
+    myProducts=data||[];
+  }catch(e){myProducts=[];}
+  renderProducts();
+  document.getElementById('st-prods').textContent=myProducts.length;
+  document.getElementById('ps-prods').textContent=myProducts.length;
+}
+
+function renderProducts(){
+  const wrap=document.getElementById('prod-grid-wrap');
+  if(!myProducts.length){
+    wrap.innerHTML=`<div style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:2.5rem;margin-bottom:10px">📦</div>
+      <div style="font-weight:700;margin-bottom:6px">No products yet</div>
+      <div style="font-size:.82rem;margin-bottom:16px">Add your first product to start receiving orders</div>
+      <button class="btn btn-accent" onclick="openModal('add-prod-modal')">+ Add First Product</button>
+    </div>`;
+    return;
+  }
+  wrap.innerHTML=`<div class="prod-grid">${myProducts.map(p=>{
+    const units=p.product_units||[];
+    return `<div class="prod-card">
+      <div class="prod-img">
+        ${p.image_url?`<img src="${p.image_url}" onerror="this.style.display='none'">`:`<span>${p.emoji||'📦'}</span>`}
+      </div>
+      <div class="prod-body">
+        <div class="prod-name">${p.name}</div>
+        <div class="prod-cat">${p.category||'—'} · ${p.region||'Tanzania'}</div>
+        <div class="prod-units">
+          ${units.map(u=>`<div class="unit-chip"><span>${u.unit_name}</span><span>TZS ${(u.price_with_markup||u.price||0).toLocaleString()}</span></div>`).join('')}
+          ${!units.length?`<div class="unit-chip"><span>Unit</span><span>TZS ${(p.price||0).toLocaleString()}</span></div>`:''}
+        </div>
+        <div class="prod-footer">
+          <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.74rem" onclick="toggleProduct('${p.id}',false)">Disable</button>
+          <button class="btn btn-red" style="flex:1;justify-content:center;font-size:.74rem" onclick="deleteProduct('${p.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+async function saveProduct(){
+  const name=document.getElementById('np-name').value.trim();
+  if(!name){showToast('❌ Product name is required',true);return;}
+  const units=[...document.querySelectorAll('#np-units .unit-row')].map(row=>{
+    const inputs=row.querySelectorAll('input');
+    return{unit_name:inputs[0]?.value.trim(),price:parseFloat(inputs[1]?.value)||0};
+  }).filter(u=>u.unit_name&&u.price>0);
+
+  try{
+    const{data:prod,error}=await sb.from('products').insert({
+      name,
+      emoji:document.getElementById('np-emoji').value||'📦',
+      category:document.getElementById('np-cat').value,
+      description:document.getElementById('np-desc').value,
+      image_url:document.getElementById('np-img').value||null,
+      stock_quantity:parseInt(document.getElementById('np-stock').value)||0,
+      available:true,
+      price:units[0]?.price||0,
+      supplier_id:currentUser?.id,
+    }).select().single();
+    if(error)throw error;
+    if(units.length&&prod){
+      await sb.from('product_units').insert(units.map(u=>({product_id:prod.id,...u})));
+    }
+    closeModal('add-prod-modal');
+    showToast('✅ Product listed successfully!');
+    // Reset form
+    ['np-name','np-emoji','np-desc','np-img','np-stock'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('np-units').innerHTML=`<div class="unit-row"><input type="text" placeholder="Unit (e.g. Debe)"/><input type="number" placeholder="Your price (TZS)"/><button class="unit-del" onclick="this.parentNode.remove()">×</button></div>`;
+    await loadProducts();
+  }catch(e){showToast('❌ '+e.message,true);}
+}
+
+async function toggleProduct(id,available){
+  try{await sb.from('products').update({available}).eq('id',id);showToast('✅ Updated');await loadProducts();}
+  catch(e){showToast('❌ '+e.message,true);}
+}
+
+async function deleteProduct(id){
+  if(!confirm('Delete this product?'))return;
+  try{await sb.from('products').delete().eq('id',id);showToast('🗑️ Deleted');await loadProducts();}
+  catch(e){showToast('❌ '+e.message,true);}
+}
+
+function addUnit(){
+  const row=document.createElement('div');row.className='unit-row';
+  row.innerHTML='<input type="text" placeholder="Unit (e.g. Gunia)"/><input type="number" placeholder="Your price (TZS)"/><button class="unit-del" onclick="this.parentNode.remove()">×</button>';
+  document.getElementById('np-units').appendChild(row);
+}
+
+// ── EARNINGS ──
+function renderEarnings(){
+  const today=new Date().toISOString().split('T')[0];
+  const week=new Date();week.setDate(week.getDate()-7);
+  const delivered=myOrders.filter(o=>o.status==='delivered');
+  const todayEarn=delivered.filter(o=>o.created_at?.startsWith(today)).reduce((s,o)=>s+(o.total_amount||0)*0.9,0);
+  const weekEarn=delivered.filter(o=>new Date(o.created_at)>=week).reduce((s,o)=>s+(o.total_amount||0)*0.9,0);
+  const total=delivered.reduce((s,o)=>s+(o.total_amount||0)*0.9,0);
+  const pending=myOrders.filter(o=>['confirmed','preparing','picked_up'].includes(o.status)).reduce((s,o)=>s+(o.total_amount||0)*0.9,0);
+
+  document.getElementById('earn-total').textContent='TZS '+Math.round(total).toLocaleString();
+  document.getElementById('earn-today').textContent='TZS '+Math.round(todayEarn).toLocaleString();
+  document.getElementById('earn-week').textContent='TZS '+Math.round(weekEarn).toLocaleString();
+  document.getElementById('earn-pending').textContent='TZS '+Math.round(pending).toLocaleString();
+
+  document.getElementById('earnings-tbl').innerHTML=!myOrders.length
+    ?'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No payment history yet</td></tr>'
+    :myOrders.map(o=>`<tr>
+      <td><strong>${o.order_reference||o.id?.slice(0,8)||'—'}</strong></td>
+      <td>TZS ${(o.total_amount||0).toLocaleString()}</td>
+      <td style="color:var(--red)">- TZS ${Math.round((o.total_amount||0)*0.1).toLocaleString()}</td>
+      <td style="color:var(--green);font-weight:700">TZS ${Math.round((o.total_amount||0)*0.9).toLocaleString()}</td>
+      <td><span class="badge ${STATUS_BADGE[o.status]||'badge-gray'}">${o.status}</span></td>
+      <td style="color:var(--muted);font-size:.76rem">${(o.created_at||'').split('T')[0]}</td>
+    </tr>`).join('');
+}
+
+function exportEarnings(){
+  const csv=[['Order','Total','Commission','Payout','Status','Date'],
+    ...myOrders.map(o=>[o.order_reference||o.id?.slice(0,8),o.total_amount,Math.round((o.total_amount||0)*0.1),Math.round((o.total_amount||0)*0.9),o.status,(o.created_at||'').split('T')[0]])
+  ].map(r=>r.map(v=>`"${v||''}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='landa-earnings.csv';a.click();
+  showToast('📥 CSV exported!');
+}
+
+// ── PROFILE ──
+async function saveProfile(){
+  const data={
+    business_name:document.getElementById('p-name').value,
+    emoji:document.getElementById('p-emoji').value,
+    description:document.getElementById('p-desc').value,
+    phone:document.getElementById('p-phone').value,
+    whatsapp:document.getElementById('p-wa').value,
+    location:document.getElementById('p-location').value,
+    region:document.getElementById('p-region').value,
+    latitude:parseFloat(document.getElementById('p-lat').value)||null,
+    longitude:parseFloat(document.getElementById('p-lng').value)||null,
+  };
+  document.getElementById('shop-name').textContent=data.business_name||'My Shop';
+  try{
+    if(myProfile?.id){
+      await sb.from('suppliers').update(data).eq('id',myProfile.id);
+    }else{
+      await sb.from('suppliers').insert({...data,user_id:currentUser.id,is_active:true,is_verified:false});
+    }
+    showToast('✅ Profile saved!');
+  }catch(e){showToast('Profile saved locally (connect Supabase for full save)');}
+}
+
+function detectLocation(){
+  if(!navigator.geolocation)return showToast('Geolocation not supported',true);
+  navigator.geolocation.getCurrentPosition(p=>{
+    document.getElementById('p-lat').value=p.coords.latitude.toFixed(6);
+    document.getElementById('p-lng').value=p.coords.longitude.toFixed(6);
+    showToast('📍 Location captured!');
+  },()=>showToast('Could not get location',true));
+}
+
+// ── HELPERS ──
+function showPage(name,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  el.classList.add('active');
+}
+
+function showAlert(msg){
+  document.getElementById('alert-detail').textContent=msg;
+  document.getElementById('new-alert').classList.add('show');
+  setTimeout(()=>document.getElementById('new-alert').classList.remove('show'),8000);
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function showToast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show'+(err?' err':'');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>
