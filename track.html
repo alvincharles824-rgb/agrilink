@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Landa — Track Your Order</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#f8f6f0;--surface:#fff;--surface2:#f3f0e8;--border:#e5e0d0;--accent:#2d6a4f;--accent2:#52b788;--accent3:#f77f00;--text:#1a1a1a;--muted:#6b7280;--red:#dc2626;--green:#16a34a;--font:'Plus Jakarta Sans',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+.topbar{background:var(--surface);border-bottom:2px solid var(--border);padding:0 20px;height:60px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+.logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
+.logo-icon{width:36px;height:36px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.logo-text{font-family:'Instrument Serif',serif;font-size:1.4rem;color:var(--accent);font-style:italic;}
+.main{max-width:680px;margin:0 auto;padding:32px 20px;}
+.search-card{background:var(--surface);border:2px solid var(--border);border-radius:18px;padding:28px;margin-bottom:24px;text-align:center;}
+.search-card h1{font-family:'Instrument Serif',serif;font-size:1.8rem;color:var(--accent);font-style:italic;margin-bottom:6px;}
+.search-card p{color:var(--muted);font-size:.88rem;margin-bottom:20px;}
+.search-row{display:flex;gap:10px;}
+.search-input{flex:1;background:var(--surface2);border:2px solid var(--border);border-radius:12px;padding:13px 16px;color:var(--text);font-family:var(--font);font-size:.95rem;outline:none;transition:border-color .2s;}
+.search-input:focus{border-color:var(--accent);}
+.btn-track{background:var(--accent);border:none;border-radius:12px;padding:13px 24px;color:#fff;font-family:var(--font);font-weight:800;font-size:.9rem;cursor:pointer;white-space:nowrap;}
+.btn-track:hover{background:#235c40;}
+
+/* RESULT */
+.result{display:none;}
+.result.show{display:block;}
+.order-card{background:var(--surface);border:2px solid var(--border);border-radius:18px;padding:24px;margin-bottom:18px;}
+.order-ref{font-size:1.4rem;font-weight:800;color:var(--accent);margin-bottom:4px;}
+.order-meta{color:var(--muted);font-size:.84rem;margin-bottom:18px;}
+
+/* PROGRESS */
+.progress-steps{display:flex;flex-direction:column;gap:0;}
+.step{display:flex;align-items:flex-start;gap:14px;padding:14px 0;position:relative;}
+.step:not(:last-child)::after{content:'';position:absolute;left:17px;top:46px;bottom:0;width:2px;background:var(--border);}
+.step.done::after,.step.current::after{background:var(--accent2);}
+.step-dot{width:36px;height:36px;border-radius:50%;border:3px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;transition:all .3s;z-index:1;}
+.step.done .step-dot{background:var(--accent);border-color:var(--accent);color:#fff;font-size:.85rem;}
+.step.current .step-dot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px rgba(45,106,79,.2);}
+.step-info{flex:1;padding-top:6px;}
+.step-title{font-weight:800;font-size:.92rem;margin-bottom:2px;}
+.step.done .step-title,.step.current .step-title{color:var(--accent);}
+.step.pending .step-title{color:var(--muted);}
+.step-sub{font-size:.78rem;color:var(--muted);}
+.step-time{font-size:.72rem;color:var(--accent2);font-weight:600;margin-top:3px;}
+
+/* DETAILS */
+.details-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+.detail-box{background:var(--surface2);border-radius:12px;padding:14px;}
+.detail-label{font-size:.7rem;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px;}
+.detail-val{font-size:.92rem;font-weight:700;}
+
+/* MAP */
+#track-map{height:260px;border-radius:14px;border:2px solid var(--border);overflow:hidden;margin-bottom:18px;}
+
+/* STATUS BADGE */
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;font-size:.82rem;font-weight:700;margin-bottom:16px;}
+.sb-pending{background:#fef3c7;color:#92400e;}
+.sb-confirmed{background:#dbeafe;color:#1d4ed8;}
+.sb-preparing{background:#ede9fe;color:#5b21b6;}
+.sb-picked{background:#f3f4f6;color:var(--muted);}
+.sb-delivered{background:#d1fae5;color:#065f46;}
+.sb-cancelled{background:#fee2e2;color:var(--red);}
+
+/* NOT FOUND */
+.not-found{text-align:center;padding:40px 20px;display:none;}
+.not-found.show{display:block;}
+.not-found-icon{font-size:3rem;margin-bottom:12px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--accent);color:#fff;padding:10px 22px;border-radius:10px;font-weight:700;font-size:.86rem;z-index:9999;transition:transform .3s;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+.loading{text-align:center;padding:40px;color:var(--muted);display:none;}
+.loading.show{display:block;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a class="logo" href="index.html">
+    <div class="logo-icon">🌿</div>
+    <div class="logo-text">Landa</div>
+  </a>
+  <a href="index.html" style="color:var(--accent);font-weight:700;font-size:.84rem;text-decoration:none">← Back to Marketplace</a>
+</div>
+
+<div class="main">
+  <!-- SEARCH -->
+  <div class="search-card">
+    <h1>Track Your Order</h1>
+    <p>Enter your order reference number to see real-time delivery status</p>
+    <div class="search-row">
+      <input class="search-input" id="track-input" placeholder="e.g. LND-1234567890" onkeypress="if(event.key==='Enter')trackOrder()"/>
+      <button class="btn-track" onclick="trackOrder()">Track Order</button>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading" id="loading"><div class="spinner"></div>Looking up your order…</div>
+
+  <!-- NOT FOUND -->
+  <div class="not-found" id="not-found">
+    <div class="not-found-icon">📭</div>
+    <div style="font-weight:800;font-size:1.1rem;margin-bottom:6px">Order not found</div>
+    <div style="color:var(--muted);font-size:.86rem">Check your order reference and try again</div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="result" id="result">
+    <!-- ORDER CARD -->
+    <div class="order-card">
+      <div class="order-ref" id="res-ref">—</div>
+      <div class="order-meta" id="res-meta">—</div>
+
+      <!-- STATUS BADGE -->
+      <div id="res-badge" class="status-badge sb-pending">⏳ Pending</div>
+
+      <!-- PROGRESS STEPS -->
+      <div class="progress-steps" id="progress-steps"></div>
+    </div>
+
+    <!-- MAP -->
+    <div id="track-map"></div>
+
+    <!-- DETAILS -->
+    <div class="details-grid">
+      <div class="detail-box"><div class="detail-label">Business</div><div class="detail-val" id="res-business">—</div></div>
+      <div class="detail-box"><div class="detail-label">Delivery Address</div><div class="detail-val" id="res-address">—</div></div>
+      <div class="detail-box"><div class="detail-label">Payment Method</div><div class="detail-val" id="res-payment">—</div></div>
+      <div class="detail-box"><div class="detail-label">Total Amount</div><div class="detail-val" id="res-total">—</div></div>
+      <div class="detail-box"><div class="detail-label">Driver</div><div class="detail-val" id="res-driver">Not assigned yet</div></div>
+      <div class="detail-box"><div class="detail-label">Est. Delivery</div><div class="detail-val" id="res-eta">—</div></div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-track" style="flex:1" onclick="refreshTracking()">🔄 Refresh Status</button>
+      <a id="call-driver-btn" href="#" class="btn-track" style="flex:1;text-align:center;display:none;text-decoration:none;background:var(--accent2)">📞 Call Driver</a>
+      <a href="index.html" class="btn-track" style="flex:1;text-align:center;text-decoration:none;background:var(--surface2);color:var(--text)">🛒 Order More</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB_URL='https://xfmxhetppwiwwfhbvvnl.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmbXhoZXRwcHdpd3dmaGJ2dm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA1NzYsImV4cCI6MjA5NzIwNjU3Nn0.t7_1cmBna9tEp-SQ4BemlZ5rQ2jsap5iBWqWbyxOhno';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+let trackMap=null,currentOrder=null;
+
+// Auto-track from URL param ?ref=LND-xxx
+window.addEventListener('DOMContentLoaded',()=>{
+  const params=new URLSearchParams(window.location.search);
+  const ref=params.get('ref');
+  if(ref){document.getElementById('track-input').value=ref;trackOrder();}
+});
+
+async function trackOrder(){
+  const ref=document.getElementById('track-input').value.trim();
+  if(!ref){showToast('Please enter your order reference');return;}
+  showLoading(true);
+  hideAll();
+  try{
+    const{data,error}=await sb.from('orders')
+      .select('*')
+      .or(`order_reference.eq.${ref},id.eq.${ref}`)
+      .single();
+    if(error||!data){showNotFound();return;}
+    currentOrder=data;
+    renderResult(data);
+    // Realtime update
+    sb.channel('track-'+ref)
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders',filter:'order_reference=eq.'+ref},payload=>{
+        currentOrder=payload.new;
+        renderResult(payload.new);
+        showToast('🔄 Status updated: '+payload.new.status?.replace('_',' '));
+      }).subscribe();
+  }catch(e){showNotFound();}
+  finally{showLoading(false);}
+}
+
+async function refreshTracking(){
+  if(!currentOrder?.order_reference)return trackOrder();
+  try{
+    const{data}=await sb.from('orders').select('*').eq('order_reference',currentOrder.order_reference).single();
+    if(data){currentOrder=data;renderResult(data);showToast('✅ Refreshed!');}
+  }catch(e){showToast('Could not refresh');}
+}
+
+function renderResult(order){
+  document.getElementById('result').classList.add('show');
+  document.getElementById('not-found').classList.remove('show');
+  document.getElementById('res-ref').textContent='#'+order.order_reference;
+  document.getElementById('res-meta').textContent='Placed: '+new Date(order.created_at).toLocaleString('en-TZ',{dateStyle:'medium',timeStyle:'short'});
+  document.getElementById('res-business').textContent=order.business_name||'—';
+  document.getElementById('res-address').textContent=order.delivery_address||'—';
+  document.getElementById('res-payment').textContent=order.payment_method||'—';
+  document.getElementById('res-total').textContent='TZS '+(order.total_amount||0).toLocaleString();
+  document.getElementById('res-driver').textContent=order.driver_name||'Not assigned yet';
+  // ETA
+  const eta=order.status==='delivered'?'Delivered!':order.status==='picked_up'?'~30 mins':order.status==='preparing'?'~60 mins':'~90 mins';
+  document.getElementById('res-eta').textContent=eta;
+  // Driver call
+  if(order.driver_phone){
+    const cb=document.getElementById('call-driver-btn');
+    cb.href='tel:'+order.driver_phone;cb.style.display='flex';
+  }
+  // Status badge
+  const badges={pending:'sb-pending ⏳',confirmed:'sb-confirmed ✅',preparing:'sb-preparing 👨‍🌾',picked_up:'sb-picked 🚚',delivered:'sb-delivered 🎉',cancelled:'sb-cancelled ❌'};
+  const bp=badges[order.status]?.split(' ')||['sb-pending','⏳'];
+  const badge=document.getElementById('res-badge');
+  badge.className='status-badge '+bp[0];
+  badge.textContent=bp.slice(1).join(' ')+' '+order.status?.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
+  // Progress
+  renderProgress(order.status);
+  // Map
+  initTrackMap(order);
+}
+
+function renderProgress(status){
+  const steps=[
+    {key:'pending',icon:'📝',title:'Order Placed',sub:'Your order has been received by Landa'},
+    {key:'confirmed',icon:'✅',title:'Confirmed',sub:'Supplier has confirmed your order'},
+    {key:'preparing',icon:'👨‍🌾',title:'Being Prepared',sub:'Supplier is preparing your goods'},
+    {key:'picked_up',icon:'🚚',title:'Picked Up',sub:'Driver has collected the order'},
+    {key:'delivered',icon:'🎉',title:'Delivered!',sub:'Your order has been delivered successfully'},
+  ];
+  const statusOrder=['pending','confirmed','preparing','picked_up','delivered'];
+  const currentIdx=statusOrder.indexOf(status);
+  document.getElementById('progress-steps').innerHTML=steps.map((s,i)=>{
+    const isDone=i<currentIdx;
+    const isCurrent=i===currentIdx;
+    const cls=isDone?'done':isCurrent?'current':'pending';
+    return `<div class="step ${cls}">
+      <div class="step-dot">${isDone?'✓':s.icon}</div>
+      <div class="step-info">
+        <div class="step-title">${s.title}</div>
+        <div class="step-sub">${s.sub}</div>
+        ${isCurrent?`<div class="step-time">● Current status</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function initTrackMap(order){
+  const lat=parseFloat(order.buyer_lat)||parseFloat(order.delivery_lat)||-6.7924;
+  const lng=parseFloat(order.buyer_lng)||parseFloat(order.delivery_lng)||39.2083;
+  if(!trackMap){
+    trackMap=L.map('track-map',{zoomControl:true}).setView([lat,lng],14);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© CartoDB'}).addTo(trackMap);
+  }else{trackMap.setView([lat,lng],14);}
+
+  // Supplier marker
+  const sLat=parseFloat(order.supplier_lat)||lat-0.01;
+  const sLng=parseFloat(order.supplier_lng)||lng+0.01;
+  L.marker([sLat,sLng],{icon:L.divIcon({html:'<div style="background:#f77f00;border-radius:8px;padding:3px 8px;font-size:.7rem;font-weight:800;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2)">🌾 Supplier</div>',className:'',iconAnchor:[40,10]})}).addTo(trackMap);
+
+  // Buyer marker
+  const bIcon=L.divIcon({html:'<div style="background:#2d6a4f;border-radius:8px;padding:3px 8px;font-size:.7rem;font-weight:800;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2)">🍽️ You</div>',className:'',iconAnchor:[25,10]});
+  L.marker([lat,lng],{icon:bIcon}).addTo(trackMap);
+
+  // Route line
+  L.polyline([[sLat,sLng],[lat,lng]],{color:'#52b788',weight:2,opacity:.7,dashArray:'6,4'}).addTo(trackMap);
+  trackMap.fitBounds([[sLat,sLng],[lat,lng]],{padding:[30,30]});
+}
+
+function showLoading(show){document.getElementById('loading').classList.toggle('show',show);}
+function showNotFound(){document.getElementById('not-found').classList.add('show');showLoading(false);}
+function hideAll(){document.getElementById('result').classList.remove('show');document.getElementById('not-found').classList.remove('show');}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+</script>
+</body>
+</html>
