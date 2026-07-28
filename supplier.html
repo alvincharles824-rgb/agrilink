@@ -201,20 +201,25 @@ tr:hover td{background:var(--surface2);}
       <div class="fg"><label>Password</label><input type="password" id="s-pass" value="supplier123"/></div>
       <button class="btn-auth" onclick="doLogin()">Sign In →</button>
     </div>
-    <!-- REGISTER -->
+    <!-- APPLY -->
     <div id="form-signup" style="display:none">
-      <div class="fg"><label>Full Name</label><input type="text" id="r-name" placeholder="Your full name"/></div>
-      <div class="fg"><label>Business Name</label><input type="text" id="r-business" placeholder="e.g. Kilimo Bora Farms"/></div>
-      <div class="fg"><label>Email</label><input type="email" id="r-email" placeholder="you@farm.com"/></div>
-      <div class="fg"><label>Phone / WhatsApp</label><input type="tel" id="r-phone" placeholder="+255 7XX XXX XXX"/></div>
+      <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.76rem;color:#065f46;line-height:1.5;">
+        📋 <strong>How it works:</strong> Submit your application below. Landa admin will review and approve you within 24 hours. You will then receive login credentials.
+      </div>
+      <div class="fg"><label>Full Name *</label><input type="text" id="r-name" placeholder="Your full name"/></div>
+      <div class="fg"><label>Business Name *</label><input type="text" id="r-business" placeholder="e.g. Kilimo Bora Farms"/></div>
+      <div class="fg"><label>Email *</label><input type="email" id="r-email" placeholder="you@farm.com"/></div>
+      <div class="fg"><label>Phone / WhatsApp *</label><input type="tel" id="r-phone" placeholder="+255 7XX XXX XXX"/></div>
       <div class="fg"><label>Region</label>
         <select id="r-region">
           <option>Dar es Salaam</option><option>Arusha</option><option>Mwanza</option>
           <option>Dodoma</option><option>Morogoro</option><option>Iringa</option><option>Other</option>
         </select>
       </div>
-      <div class="fg"><label>Password</label><input type="password" id="r-pass" placeholder="Min 6 characters"/></div>
-      <button class="btn-auth" onclick="doSignup()">Create Account →</button>
+      <div class="fg"><label>Location / Market</label><input type="text" id="r-location" placeholder="e.g. Kariakoo Market, Dar es Salaam"/></div>
+      <div class="fg"><label>What products do you sell? *</label><input type="text" id="r-products" placeholder="e.g. Viazi, Nyanya, Vitunguu, Mafuta…"/></div>
+      <div class="fg"><label>Tell us about your business</label><textarea id="r-desc" rows="2" placeholder="How long have you been in business? How much stock do you have?…"></textarea></div>
+      <button class="btn-auth" onclick="doSignup()">Submit Application →</button>
     </div>
   </div>
 </div>
@@ -505,16 +510,30 @@ async function doSignup(){
   const business=document.getElementById('r-business').value.trim();
   const email=document.getElementById('r-email').value.trim();
   const phone=document.getElementById('r-phone').value.trim();
-  const pass=document.getElementById('r-pass').value;
-  const region=document.getElementById('r-region').value;
-  if(!name||!email||!pass){showToast('❌ Fill all required fields',true);return;}
-  const{error}=await sb.auth.signUp({email,password:pass,options:{data:{full_name:name,business_name:business,phone,role:'supplier'}}});
-  if(error){showToast('❌ '+error.message,true);return;}
-  // Create supplier profile
+  const products=document.getElementById('r-products').value.trim();
+  if(!name||!business||!email||!phone||!products){showToast('❌ Fill all required fields',true);return;}
   try{
-    await sb.from('suppliers').insert({business_name:business||name,phone,region,is_active:true,is_verified:false,total_orders:0,rating:0});
-  }catch(e){}
-  showToast('🎉 Account created! Please check your email to verify.');
+    const{error}=await sb.from('supplier_applications').insert({
+      full_name:name,
+      business_name:business,
+      email,
+      phone,
+      region:document.getElementById('r-region').value,
+      location:document.getElementById('r-location').value,
+      products_sold:products,
+      description:document.getElementById('r-desc').value,
+      status:'pending',
+    });
+    if(error)throw error;
+    // Show success screen
+    document.getElementById('form-signup').innerHTML=`
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:3rem;margin-bottom:12px">🎉</div>
+        <div style="font-weight:800;font-size:1.1rem;color:var(--accent);margin-bottom:8px">Application Submitted!</div>
+        <div style="color:var(--muted);font-size:.84rem;line-height:1.6">Thank you <strong>${name}</strong>! Landa will review your application and contact you at <strong>${phone}</strong> within 24 hours.</div>
+      </div>`;
+    showToast('✅ Application submitted successfully!');
+  }catch(e){showToast('❌ '+e.message,true);}
 }
 
 async function doLogout(){
