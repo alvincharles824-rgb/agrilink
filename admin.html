@@ -193,6 +193,8 @@ tr:hover td{background:var(--surface2);}
 
   <div class="nav-section">Operations</div>
   <div class="nav-item" onclick="showSec('deliveries',this)"><span class="icon">🚚</span><span>Deliveries</span></div>
+  <div class="nav-item" onclick="showSec('drivers',this)"><span class="icon">🏍️</span><span>Drivers</span><div class="notif-dot" id="drivers-dot" style="display:none"></div></div>
+  <div class="nav-item" onclick="showSec('applications',this)"><span class="icon">📋</span><span>Applications</span><div class="notif-dot" id="apps-dot" style="display:none"></div></div>
   <div class="nav-item" onclick="showSec('analytics',this)"><span class="icon">📈</span><span>Analytics</span></div>
   <div class="nav-item" onclick="showSec('portals',this)"><span class="icon">🔗</span><span>All Portals</span></div>
 
@@ -455,6 +457,70 @@ tr:hover td{background:var(--surface2);}
     </div>
   </div>
 
+  <!-- DRIVERS -->
+  <div class="page-section" id="sec-drivers">
+    <div class="three-col" style="margin-bottom:20px">
+      <div class="stat-card" style="--accent-color:var(--green)">
+        <div class="stat-label">Total Drivers</div><div class="stat-val" id="dr-total">0</div><div class="stat-sub">Registered</div>
+      </div>
+      <div class="stat-card" style="--accent-color:var(--blue)">
+        <div class="stat-label">Active Drivers</div><div class="stat-val" id="dr-active">0</div><div class="stat-sub">Approved & working</div>
+      </div>
+      <div class="stat-card" style="--accent-color:var(--yellow)">
+        <div class="stat-label">Pending Approval</div><div class="stat-val" id="dr-pending">0</div><div class="stat-sub">Awaiting review</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🏍️ All Drivers</div>
+        <div style="display:flex;gap:8px">
+          <input class="fi" placeholder="Search drivers…" oninput="filterTable('drivers-tbl',this.value)" style="min-width:180px"/>
+          <button class="btn-primary" onclick="openModal('add-driver-modal')">+ Add Driver</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Name</th><th>Phone</th><th>Email</th><th>Vehicle</th>
+            <th>Plate</th><th>Region</th><th>Deliveries</th><th>Rating</th>
+            <th>Status</th><th>Online</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="drivers-tbl"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUPPLIER APPLICATIONS -->
+  <div class="page-section" id="sec-applications">
+    <div class="three-col" style="margin-bottom:20px">
+      <div class="stat-card" style="--accent-color:var(--yellow)">
+        <div class="stat-label">Pending</div><div class="stat-val" id="ap-pending">0</div><div class="stat-sub">Awaiting review</div>
+      </div>
+      <div class="stat-card" style="--accent-color:var(--green)">
+        <div class="stat-label">Approved</div><div class="stat-val" id="ap-approved">0</div><div class="stat-sub">Now active suppliers</div>
+      </div>
+      <div class="stat-card" style="--accent-color:var(--red)">
+        <div class="stat-label">Rejected</div><div class="stat-val" id="ap-rejected">0</div><div class="stat-sub">Not qualified</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📋 Supplier Applications</div>
+        <input class="fi" placeholder="Search applications…" oninput="filterTable('apps-tbl',this.value)" style="min-width:200px"/>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Business Name</th><th>Owner</th><th>Email</th><th>Phone</th>
+            <th>Region</th><th>Products They Sell</th><th>Applied</th><th>Status</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="apps-tbl"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ANALYTICS -->
   <div class="page-section" id="sec-analytics">
     <div class="stats-grid">
@@ -614,6 +680,65 @@ tr:hover td{background:var(--surface2);}
 
 <div class="toast" id="toast"></div>
 
+<!-- ADD DRIVER MODAL -->
+<div class="modal-overlay" id="add-driver-modal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal('add-driver-modal')">×</button>
+    <h2>🏍️ Add New Driver</h2>
+    <div class="form-row">
+      <div class="fg"><label>Full Name *</label><input type="text" id="nd-name" placeholder="Driver full name"/></div>
+      <div class="fg"><label>Phone *</label><input type="tel" id="nd-phone" placeholder="+255 7XX XXX XXX"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Email</label><input type="email" id="nd-email" placeholder="driver@email.com"/></div>
+      <div class="fg"><label>Vehicle Type</label>
+        <select id="nd-vehicle">
+          <option value="motorcycle">🏍️ Motorcycle</option>
+          <option value="pickup">🛻 Pickup Truck</option>
+          <option value="truck">🚛 Truck</option>
+          <option value="bicycle">🚲 Bicycle</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Plate Number</label><input type="text" id="nd-plate" placeholder="T XXX XXX"/></div>
+      <div class="fg"><label>Region</label>
+        <select id="nd-region">
+          <option>Dar es Salaam</option><option>Arusha</option><option>Mwanza</option>
+          <option>Dodoma</option><option>Morogoro</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Location / Area</label><input type="text" id="nd-location" placeholder="e.g. Kinondoni"/></div>
+    <div class="fg"><label>Notes (optional)</label><textarea id="nd-notes" placeholder="Any additional info about this driver…"></textarea></div>
+    <div class="fg"><label>Approved?</label>
+      <select id="nd-approved">
+        <option value="true">✅ Yes — Approved to work</option>
+        <option value="false">⏳ No — Pending review</option>
+      </select>
+    </div>
+    <div class="mfooter">
+      <button class="btn-sm" onclick="closeModal('add-driver-modal')">Cancel</button>
+      <button class="btn-primary" onclick="saveDriver()">Add Driver</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW APPLICATION MODAL -->
+<div class="modal-overlay" id="view-app-modal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal('view-app-modal')">×</button>
+    <h2>📋 Supplier Application</h2>
+    <div id="app-details"></div>
+    <div class="fg"><label>Admin Notes</label><textarea id="app-notes" placeholder="Reason for approval or rejection…"></textarea></div>
+    <div class="mfooter">
+      <button class="btn-sm" onclick="closeModal('view-app-modal')">Close</button>
+      <button class="btn-sm" style="background:#fee2e2;color:var(--red);border-color:#fca5a5" onclick="reviewApplication(currentAppId,'rejected')">❌ Reject</button>
+      <button class="btn-primary" onclick="reviewApplication(currentAppId,'approved')">✅ Approve → Create Supplier</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SB_URL='https://xfmxhetppwiwwfhbvvnl.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmbXhoZXRwcHdpd3dmaGJ2dm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA1NzYsImV4cCI6MjA5NzIwNjU3Nn0.t7_1cmBna9tEp-SQ4BemlZ5rQ2jsap5iBWqWbyxOhno';
@@ -659,6 +784,11 @@ function showDashboard(user){
       loadAll();
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'orders'},()=>loadAll())
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'supplier_applications'},payload=>{
+      showToast('📋 New supplier application: '+(payload.new?.business_name||''));
+      document.getElementById('apps-dot').style.display='block';
+      loadApplications();
+    })
     .subscribe();
   // Refresh every 30 seconds
   setInterval(loadAll,30000);
@@ -666,7 +796,7 @@ function showDashboard(user){
 
 // ── LOAD ALL DATA ──
 async function loadAll(){
-  await Promise.all([loadOrders(),loadSuppliers(),loadPayments(),loadDeliveries(),loadBuyers()]);
+  await Promise.all([loadOrders(),loadSuppliers(),loadPayments(),loadDeliveries(),loadBuyers(),loadDrivers(),loadApplications()]);
 }
 
 async function loadOrders(){
@@ -1074,6 +1204,184 @@ function exportPayments(){
   const csv=[h,...allPayments.map(p=>[p.order_id?.slice(0,8),p.buyer_id?.slice(0,8),p.total_amount,p.commission,p.delivery_fee,p.supplier_payout,p.payment_method,p.payment_status])].map(r=>r.map(v=>`"${v||''}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='landa-payments.csv';a.click();
   showToast('📥 CSV exported!');
+}
+
+// ── DRIVERS ──
+let allDrivers=[], currentAppId=null;
+
+async function loadDrivers(){
+  try{
+    const{data}=await sb.from('drivers').select('*').order('created_at',{ascending:false});
+    allDrivers=data||[];
+  }catch(e){allDrivers=[];}
+  renderDrivers();
+  updateDriverStats();
+}
+
+function updateDriverStats(){
+  document.getElementById('dr-total').textContent=allDrivers.length;
+  document.getElementById('dr-active').textContent=allDrivers.filter(d=>d.is_approved&&d.is_active).length;
+  document.getElementById('dr-pending').textContent=allDrivers.filter(d=>!d.is_approved).length;
+  const pending=allDrivers.filter(d=>!d.is_approved).length;
+  document.getElementById('drivers-dot').style.display=pending>0?'block':'none';
+}
+
+function renderDrivers(){
+  document.getElementById('drivers-tbl').innerHTML=!allDrivers.length
+    ?'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--muted)">No drivers yet — click "+ Add Driver" to add your first driver</td></tr>'
+    :allDrivers.map(d=>`<tr>
+      <td><strong>${d.full_name}</strong></td>
+      <td>${d.phone}</td>
+      <td>${d.email||'—'}</td>
+      <td>${{motorcycle:'🏍️ Motorcycle',pickup:'🛻 Pickup',truck:'🚛 Truck',bicycle:'🚲 Bicycle'}[d.vehicle_type]||d.vehicle_type}</td>
+      <td>${d.plate_number||'—'}</td>
+      <td>${d.region||'—'}</td>
+      <td>${d.total_deliveries||0}</td>
+      <td>${d.rating>0?'⭐ '+d.rating:'New'}</td>
+      <td>${d.is_approved?'<span class="badge badge-green">✅ Approved</span>':'<span class="badge badge-yellow">⏳ Pending</span>'}</td>
+      <td>${d.is_online?'<span class="badge badge-green">🟢 Online</span>':'<span class="badge badge-gray">⚫ Offline</span>'}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-sm" onclick="toggleDriver('${d.id}',${!d.is_approved})">${d.is_approved?'Suspend':'Approve'}</button>
+        <a href="tel:${d.phone}" class="btn-sm" style="text-decoration:none">📞 Call</a>
+        <a href="https://wa.me/${(d.phone||'').replace(/\D/g,'')}" target="_blank" class="btn-sm" style="color:var(--green);text-decoration:none">💬 WA</a>
+        <button class="btn-sm" style="color:var(--red)" onclick="deleteDriver('${d.id}')">Remove</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function saveDriver(){
+  const name=document.getElementById('nd-name').value.trim();
+  const phone=document.getElementById('nd-phone').value.trim();
+  if(!name||!phone){showToast('❌ Name and phone required');return;}
+  try{
+    await sb.from('drivers').insert({
+      full_name:name,phone,
+      email:document.getElementById('nd-email').value,
+      vehicle_type:document.getElementById('nd-vehicle').value,
+      plate_number:document.getElementById('nd-plate').value,
+      region:document.getElementById('nd-region').value,
+      location:document.getElementById('nd-location').value,
+      notes:document.getElementById('nd-notes').value,
+      is_approved:document.getElementById('nd-approved').value==='true',
+      is_active:true,is_online:false,total_deliveries:0,rating:0,
+    });
+    closeModal('add-driver-modal');
+    showToast('✅ Driver added!');
+    // Clear form
+    ['nd-name','nd-phone','nd-email','nd-plate','nd-location','nd-notes'].forEach(id=>document.getElementById(id).value='');
+    await loadDrivers();
+  }catch(e){showToast('❌ '+e.message);}
+}
+
+async function toggleDriver(id,approved){
+  try{
+    await sb.from('drivers').update({is_approved:approved,updated_at:new Date().toISOString()}).eq('id',id);
+    showToast(approved?'✅ Driver approved!':'⚠️ Driver suspended');
+    await loadDrivers();
+  }catch(e){showToast('❌ '+e.message);}
+}
+
+async function deleteDriver(id){
+  if(!confirm('Remove this driver from Landa?'))return;
+  try{
+    await sb.from('drivers').delete().eq('id',id);
+    showToast('🗑️ Driver removed');
+    await loadDrivers();
+  }catch(e){showToast('❌ '+e.message);}
+}
+
+// ── SUPPLIER APPLICATIONS ──
+let allApplications=[];
+
+async function loadApplications(){
+  try{
+    const{data}=await sb.from('supplier_applications').select('*').order('created_at',{ascending:false});
+    allApplications=data||[];
+  }catch(e){allApplications=[];}
+  renderApplications();
+  updateAppStats();
+}
+
+function updateAppStats(){
+  document.getElementById('ap-pending').textContent=allApplications.filter(a=>a.status==='pending').length;
+  document.getElementById('ap-approved').textContent=allApplications.filter(a=>a.status==='approved').length;
+  document.getElementById('ap-rejected').textContent=allApplications.filter(a=>a.status==='rejected').length;
+  const pending=allApplications.filter(a=>a.status==='pending').length;
+  document.getElementById('apps-dot').style.display=pending>0?'block':'none';
+}
+
+function renderApplications(){
+  document.getElementById('apps-tbl').innerHTML=!allApplications.length
+    ?'<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted)">No applications yet — suppliers apply from the marketplace</td></tr>'
+    :allApplications.map(a=>`<tr>
+      <td><strong>${a.business_name}</strong></td>
+      <td>${a.full_name}</td>
+      <td>${a.email}</td>
+      <td>${a.phone}</td>
+      <td>${a.region||'—'}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.products_sold||'—'}</td>
+      <td style="color:var(--muted);font-size:.74rem">${(a.created_at||'').split('T')[0]}</td>
+      <td>
+        ${{pending:'<span class="badge badge-yellow">⏳ Pending</span>',approved:'<span class="badge badge-green">✅ Approved</span>',rejected:'<span class="badge badge-red">❌ Rejected</span>'}[a.status]||''}
+      </td>
+      <td>
+        ${a.status==='pending'?`<button class="btn-primary" style="font-size:.74rem;padding:6px 12px" onclick="viewApplication('${a.id}')">Review →</button>`
+        :`<button class="btn-sm" onclick="viewApplication('${a.id}')">View</button>`}
+      </td>
+    </tr>`).join('');
+}
+
+function viewApplication(id){
+  currentAppId=id;
+  const a=allApplications.find(x=>x.id===id);
+  if(!a)return;
+  document.getElementById('app-details').innerHTML=`
+    <div style="background:var(--surface2);border-radius:10px;padding:16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">BUSINESS NAME</div><div style="font-weight:800">${a.business_name}</div></div>
+      <div><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">OWNER</div><div style="font-weight:800">${a.full_name}</div></div>
+      <div><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">EMAIL</div><div>${a.email}</div></div>
+      <div><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">PHONE</div><div>${a.phone}</div></div>
+      <div><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">REGION</div><div>${a.region||'—'}</div></div>
+      <div><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">APPLIED</div><div>${(a.created_at||'').split('T')[0]}</div></div>
+      <div style="grid-column:1/-1"><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">PRODUCTS THEY SELL</div><div>${a.products_sold||'—'}</div></div>
+      <div style="grid-column:1/-1"><div style="font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:3px">DESCRIPTION</div><div>${a.description||'—'}</div></div>
+    </div>`;
+  document.getElementById('app-notes').value=a.admin_notes||'';
+  openModal('view-app-modal');
+}
+
+async function reviewApplication(id,status){
+  const a=allApplications.find(x=>x.id===id);
+  if(!a)return;
+  const notes=document.getElementById('app-notes').value;
+  try{
+    // Update application status
+    await sb.from('supplier_applications').update({
+      status,admin_notes:notes,reviewed_at:new Date().toISOString()
+    }).eq('id',id);
+
+    // If approved → automatically create supplier profile
+    if(status==='approved'){
+      await sb.from('suppliers').insert({
+        business_name:a.business_name,
+        phone:a.phone,
+        email:a.email,
+        description:a.description,
+        region:a.region,
+        location:a.location,
+        is_verified:true,
+        is_approved:true,
+        is_active:true,
+        rating:0,
+        total_orders:0,
+      });
+      showToast('✅ Supplier approved & profile created!');
+    }else{
+      showToast('❌ Application rejected');
+    }
+    closeModal('view-app-modal');
+    await Promise.all([loadApplications(),loadSuppliers()]);
+  }catch(e){showToast('❌ '+e.message);}
 }
 
 function showSec(name,el){
