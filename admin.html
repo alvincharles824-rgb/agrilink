@@ -851,13 +851,49 @@ function addCart(e,pid,name,unit,price,emoji){
   updateCartUI();
   showToast('✅ '+name+' ('+unit+') added!');
 }
-function updateCartUI(){
-  const count=cart.reduce((s,i)=>s+i.qty,0);
-  document.getElementById('cart-count').textContent=count;
-  const body=document.getElementById('cart-body'),footer=document.getElementById('cart-footer');
-  if(!cart.length){body.innerHTML='<div class="empty-cart"><div style="font-size:3rem;margin-bottom:12px">🛒</div><div style="font-weight:700;margin-bottom:6px">Cart is empty</div><div style="font-size:.84rem;color:var(--muted)">Browse products and add items</div></div>';footer.style.display='none';return;}
+
+  document.getElementById('cf-fee').textContent='TZS '+fee.toLocaleString();
+  document.getElementById('cf-total').textContent='TZS '+(sub+DELIVERY_FEE).toLocaleString();
+  footer.style.display='block';
+}
+function chgQty(key,d){const i=cart.find(x=>x.key===key);if(!i)return;i.qty+=d;if(i.qty<=0)cart=cart.filter(x=>x.key!==key);updateCartUI();}
+function clearCart(){cart=[];updateCartUI();}
+function toggleCart(){document.getElementById('cart-panel').classList.toggle('open');document.getElementById('cart-overlay').classList.toggle('open');updateCartUI();}
+function openCheckout(){
+  if(!currentUser){toggleCart();openModal('auth-modal');showToast('Please sign in first');return;}
+  if(!cart.length)return;
   const sub=cart.reduce((s,i)=>s+i.price*i.qty,0);
   const fee=Math.round(sub*.1);
-  body.innerHTML=cart.map(i=>`<div class="ci"><div class="ci-emoji">${i.emoji}</div><div class="ci-info"><div class="ci-name">${i.name}</div><div class="ci-unit">${i.unit}</div><div class="ci-price">TZS ${(i.price*i.qty).toLocaleString()}</div></div><div class="qty-ctrl"><div class="qb" onclick="chgQty('${i.key}',-1)">−</div><span style="font-weight:800;min-width:22px;text-align:center">${i.qty}</span><div class="qb" onclick="chgQty('${i.key}',1)">+</div></div></div>`).join('');
-  document.getElementById('cf-sub').textContent='TZS '+sub.toLocaleString();
-  document.getElementById('cf-fee
+  document.getElementById('order-summary').innerHTML='<div class="os-title">Order Summary ('+cart.reduce((s,i)=>s+i.qty,0)+' items)</div>'+cart.map(i=>'<div class="os-row"><span>'+i.name+' × '+i.qty+' ('+i.unit+')</span><span>TZS '+(i.price*i.qty).toLocaleString()+'</span></div>').join('')+'<div class="os-row"><span>Platform fee (10%)</span><span>TZS '+fee.toLocaleString()+'</span></div><div class="os-row"><span>Delivery</span><span>TZS '+DELIVERY_FEE.toLocaleString()+'</span></div><div class="os-row tot"><span>Total to Pay</span><span>TZS '+(sub+DELIVERY_FEE).toLocaleString()+'</span></div>';
+  openModal('checkout-modal');
+}
+function selPay(m){selPayment=m;document.querySelectorAll('.pay-opt').forEach(p=>p.classList.remove('sel'));document.getElementById('po-'+m).classList.add('sel');document.getElementById('net-wrap').style.display=m==='selcom'?'block':'none';}
+function selNet(n,el){selNetwork=n;document.querySelectorAll('.net-pill').forEach(p=>p.classList.remove('sel'));el.classList.add('sel');}
+async function placeOrder(){
+  const biz=document.getElementById('co-biz').value.trim();
+  const addr=document.getElementById('co-addr').value.trim();
+  const phone=document.getElementById('co-phone').value.trim();
+  if(!biz||!addr||!phone){showToast('Please fill all required fields');return;}
+  const sub=cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const commission=Math.round(sub*.1);
+  const total=sub+DELIVERY_FEE;
+  const ref='LND-'+Date.now();
+  try{
+    const{data:order,error}=await sb.from('orders').insert({buyer_id:currentUser.id,business_name:biz,delivery_address:addr,phone,notes:document.getElementById('co-notes').value,payment_method:selPayment,payment_network:selNetwork,total_amount:total,commission,delivery_fee:DELIVERY_FEE,status:'pending',order_reference:ref}).select().single();
+    if(!error&&order){
+      const items=cart.map(i=>({order_id:order.id,product_id:i.pid,product_name:i.name,unit_name:i.unit,quantity:i.qty,unit_price:i.price,subtotal:i.price*i.qty}));
+      await sb.from('order_items').insert(items);
+      await sb.from('payments').insert({order_id:order.id,buyer_id:currentUser.id,total_amount:total,commission,delivery_fee:DELIVERY_FEE,supplier_payout:sub-commission,payment_method:selPayment,payment_status:'pending'});
+    }
+  }catch(e){console.log('Order error:',e);}
+  closeModal('checkout-modal');
+  document.getElementById('suc-ref').textContent=ref;
+  openModal('success-modal');
+  clearCart();
+}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function showToast(msg,d=3000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),d);}
+</script>
+</body>
+</html>
