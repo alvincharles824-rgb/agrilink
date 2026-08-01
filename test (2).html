@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/><title>Landa Test</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body style="font-family:sans-serif;padding:30px;background:#f8f4ec">
+<h2>🌿 Landa — Database Test</h2>
+<div id="result" style="margin-top:20px;padding:20px;background:#fff;border-radius:12px;border:2px solid #e5e0d0">Testing connection...</div>
+
+<script>
+const sb = supabase.createClient(
+  'https://xfmxhetppwiwwfhbvvnl.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmbXhoZXRwcHdpd3dmaGJ2dm5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzA1NzYsImV4cCI6MjA5NzIwNjU3Nn0.t7_1cmBna9tEp-SQ4BemlZ5rQ2jsap5iBWqWbyxOhno'
+);
+
+async function test(){
+  const res = document.getElementById('result');
+  
+  // Test products
+  const{data:prods, error:pe} = await sb.from('products').select('*, product_units(*)');
+  
+  // Test suppliers
+  const{data:sups, error:se} = await sb.from('suppliers').select('*');
+  
+  if(pe || se){
+    res.innerHTML = '<p style="color:red">❌ Error: ' + (pe?.message||se?.message) + '</p>';
+    return;
+  }
+  
+  res.innerHTML = `
+    <p>✅ Connected to Supabase!</p>
+    <p>📦 Products found: <strong>${prods?.length||0}</strong></p>
+    <p>🌾 Suppliers found: <strong>${sups?.length||0}</strong></p>
+    <hr style="margin:16px 0"/>
+    <p><strong>Products:</strong></p>
+    ${prods?.map(p=>`
+      <div style="padding:10px;margin:6px 0;background:#f3f0e8;border-radius:8px">
+        <strong>${p.name}</strong> — ${p.category} — ${p.region||'No region'}<br/>
+        Image: ${p.image_url?'✅ '+p.image_url.slice(0,60)+'...':'❌ No image'}<br/>
+        Units: ${p.product_units?.map(u=>u.unit_name+' TZS '+u.price_with_markup).join(', ')||'❌ No units'}<br/>
+        <img src="${p.image_url||''}" style="width:100px;height:70px;object-fit:cover;border-radius:6px;margin-top:6px" onerror="this.style.display='none'"/>
+      </div>
+    `).join('')||'<p>No products</p>'}
+    <hr style="margin:16px 0"/>
+    <p><strong>Suppliers:</strong></p>
+    ${sups?.map(s=>`<div style="padding:8px;background:#f3f0e8;border-radius:8px;margin:4px 0"><strong>${s.business_name}</strong> — ${s.region}</div>`).join('')||'<p>No suppliers</p>'}
+  `;
+}
+test();
+</script>
+</body>
+</html>
