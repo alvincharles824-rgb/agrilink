@@ -729,16 +729,40 @@ function selRole(r){selRole=r;document.getElementById('ro-buyer').classList.togg
 
 // ── LOAD DATA ──
 async function loadData(){
+  // Load products — show loading state
+  document.getElementById('prods-container').innerHTML='<div class="loading"><div class="spin"></div>Loading products…</div>';
+
   try{
-    const[{data:prods},{data:sups}]=await Promise.all([
-      sb.from('products').select('*, product_units(*)').eq('available',true).order('created_at',{ascending:false}),
-      sb.from('suppliers').select('*').eq('is_active',true).order('rating',{ascending:false})
-    ]);
-    allProducts=prods?.length?prods.map(p=>({...p,units:p.product_units||[]})):DEMO_PRODUCTS;
-    allSuppliers=sups?.length?sups:DEMO_SUPPLIERS;
-  }catch(e){allProducts=DEMO_PRODUCTS;allSuppliers=DEMO_SUPPLIERS;}
+    const{data:prods,error:pe}=await sb.from('products')
+      .select('*, product_units(*)')
+      .order('created_at',{ascending:false});
+
+    if(!pe && prods && prods.length>0){
+      // Show ALL products including unavailable ones for now
+      allProducts=prods.map(p=>({...p,units:p.product_units||[]}));
+    } else {
+      // Show demo only if real products fail completely
+      allProducts=DEMO_PRODUCTS;
+    }
+  }catch(e){
+    allProducts=DEMO_PRODUCTS;
+  }
+
+  try{
+    const{data:sups}=await sb.from('suppliers')
+      .select('*')
+      .eq('is_active',true)
+      .order('created_at',{ascending:false});
+    allSuppliers=(sups&&sups.length>0)?sups:DEMO_SUPPLIERS;
+  }catch(e){
+    allSuppliers=DEMO_SUPPLIERS;
+  }
+
   filteredProducts=[...allProducts];
-  renderProducts();renderSuppliers();updateStats();updateCatCounts();
+  renderProducts();
+  renderSuppliers();
+  updateStats();
+  updateCatCounts();
 }
 
 function updateStats(){
