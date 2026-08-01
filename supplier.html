@@ -720,9 +720,21 @@ function searchOrders(q){
 // ── PRODUCTS ──
 async function loadProducts(){
   try{
-    const{data}=await sb.from('products').select('*, product_units(*)').eq('available',true).order('created_at',{ascending:false});
-    myProducts=data||[];
-  }catch(e){myProducts=[];}
+    // Load ALL products — no filter by supplier so demo works
+    const{data,error}=await sb.from('products')
+      .select('*, product_units(*)')
+      .order('created_at',{ascending:false});
+    if(!error&&data){
+      myProducts=data;
+      console.log('Loaded products:',data.length);
+    } else {
+      console.log('Products error:',error);
+      myProducts=[];
+    }
+  }catch(e){
+    console.log('Load error:',e);
+    myProducts=[];
+  }
   renderProducts();
   document.getElementById('st-prods').textContent=myProducts.length;
   document.getElementById('ps-prods').textContent=myProducts.length;
@@ -770,7 +782,7 @@ async function saveProduct(){
   }).filter(u=>u.unit_name&&u.price>0);
 
   try{
-    const{data:prod,error}=await sb.from('products').insert({
+    const productData={
       name,
       emoji:document.getElementById('np-emoji').value||'📦',
       category:document.getElementById('np-cat').value,
@@ -779,8 +791,12 @@ async function saveProduct(){
       stock_quantity:parseInt(document.getElementById('np-stock').value)||0,
       available:true,
       price:units[0]?.price||0,
-      supplier_id:currentUser?.id,
-    }).select().single();
+    };
+    // Only add supplier_id if real user (not demo)
+    if(currentUser?.id&&currentUser.id!=='demo-supplier'){
+      productData.supplier_id=currentUser.id;
+    }
+    const{data:prod,error}=await sb.from('products').insert(productData).select().single();
     if(error)throw error;
     if(units.length&&prod){
       await sb.from('product_units').insert(units.map(u=>({product_id:prod.id,...u})));
